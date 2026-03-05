@@ -2,29 +2,56 @@ package com.gridinsight.backend.security;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity
 public class WebSecurityConfig {
 
     @Bean
-    SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain filterChain(HttpSecurity http, JwtAuthenticationFilter jwtAuthenticationFilter) throws Exception {
         http
-                .csrf(csrf -> csrf.disable()) // allow POST from Postman without CSRF token
+                // Stateless API with JWT
+                .csrf(csrf -> csrf.disable())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
                 .authorizeHttpRequests(auth -> auth
-                        // Open just the auth endpoints for now
-                        .requestMatchers("/api/auth/register", "/api/auth/login",
-                                "/swagger-ui/**", "/v3/api-docs/**").permitAll()
-                        // For dev: either open everything or keep others authenticated.
-                        .anyRequest().permitAll()
+                        // Allow auth endpoints without a token
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/auth/register",
+                                "/api/auth/login",
+                                "/api/auth/refresh",
+                                "/api/auth/password/forgot",
+                                "/api/auth/password/reset"
+                        ).permitAll()
+
+                        // (Optional) docs
+                        .requestMatchers(
+                                "/swagger-ui/**",
+                                "/v3/api-docs/**"
+                        ).permitAll()
+
+                        // User management endpoints (will add RBAC in Phase 5)
+                        .requestMatchers("/api/users/**").authenticated()
+
+                        // Audit log endpoints
+                        .requestMatchers("/api/audit/**").authenticated()
+
+                        // Everything else requires authentication
+                        .anyRequest().authenticated()
                 )
-                .httpBasic(Customizer.withDefaults()); // keep defaults light for dev
+
+                // Your JWT filter should only authenticate when an Authorization header is present
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+
+                // Disable HTTP Basic for API
+                .httpBasic(httpBasic -> httpBasic.disable());
 
         return http.build();
     }

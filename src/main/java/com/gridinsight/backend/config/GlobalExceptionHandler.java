@@ -18,6 +18,12 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(new ApiError("VALIDATION_FAILED", errors));
     }
 
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    public ResponseEntity<?> handleDataIntegrity(org.springframework.dao.DataIntegrityViolationException ex) {
+        return ResponseEntity.status(409)
+                .body(new ApiError("CONFLICT", List.of("Data conflict")));
+    }
+
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<?> handleConflict(IllegalStateException ex) {
         return ResponseEntity.status(409).body(new ApiError("CONFLICT", List.of(ex.getMessage())));
@@ -31,6 +37,21 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<?> handleUnknown(Exception ex) {
         return ResponseEntity.internalServerError().body(new ApiError("INTERNAL_ERROR", List.of("Unexpected error")));
+    }
+
+    @ExceptionHandler(com.gridinsight.backend.exception.UnauthorizedException.class)
+    public ResponseEntity<?> handleUnauthorized(com.gridinsight.backend.exception.UnauthorizedException ex) {
+        return ResponseEntity.status(401).body(new ApiError("UNAUTHORIZED", List.of(ex.getMessage())));
+    }
+
+    @ExceptionHandler(com.gridinsight.backend.exception.AccountLockedException.class)
+    public ResponseEntity<?> handleLocked(com.gridinsight.backend.exception.AccountLockedException ex) {
+        return ResponseEntity.status(423).body(new ApiError("LOCKED", List.of(ex.getMessage())));
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<?> handleBadRequest(IllegalArgumentException ex) {
+        return ResponseEntity.badRequest().body(new ApiError("BAD_REQUEST", List.of(ex.getMessage())));
     }
 
     record ApiError(String code, List<String> messages) {}

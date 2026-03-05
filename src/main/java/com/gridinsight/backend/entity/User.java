@@ -37,5 +37,31 @@ public class User {
     @JoinTable(name = "user_roles",
             joinColumns = @JoinColumn(name = "user_id"),
             inverseJoinColumns = @JoinColumn(name = "role_id"))
+    @Builder.Default
     private Set<Role> roles = new HashSet<>();
+
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private java.time.Instant createdAt;
+
+    @Column(name = "updated_at")
+    private java.time.Instant updatedAt;
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = java.time.Instant.now();
+        updatedAt = java.time.Instant.now();
+    }
+
+
+    @Column(name = "failed_attempts", nullable = false)
+    private int failedAttempts;
+
+    @Column(name = "lock_until")
+    private java.time.Instant lockUntil;
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = java.time.Instant.now();
+    }
 }
