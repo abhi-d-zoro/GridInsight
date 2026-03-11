@@ -1,6 +1,6 @@
 package com.gridinsight.backend.IAM_1.service;
 
-import com.gridinsight.backend.IAM_1.dto.CreateUserRequest;
+import com.gridinsight.backend.IAM_1.dto.AdminCreateUserRequest;
 import com.gridinsight.backend.IAM_1.dto.UpdateUserRequest;
 import com.gridinsight.backend.IAM_1.dto.UserResponse;
 import com.gridinsight.backend.IAM_1.entity.Role;
@@ -32,44 +32,45 @@ public class UserManagementService {
     private final AuditLogService auditLogService;
 
     @Transactional
-    public UserResponse createUser(CreateUserRequest request) {
-        // Check if user already exists
-        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
-            throw new IllegalArgumentException("User with email " + request.getEmail() + " already exists");
+    public UserResponse createUser(AdminCreateUserRequest request) {
+        // 1) Email uniqueness
+        if (userRepository.findByEmail(request.email()).isPresent()) {
+            throw new IllegalArgumentException("User with email " + request.email() + " already exists");
         }
 
-        // Create user
+        // 2) Resolve the single role from DTO
+        String roleName = request.role() == null ? "" : request.role().toUpperCase().trim();
+        if (roleName.isBlank()) {
+            throw new IllegalArgumentException("Role is required");
+        }
+        Role role = roleRepository.findByName(roleName)
+                .orElseThrow(() -> new IllegalArgumentException("Role not found: " + roleName));
+
+        // 3) Create user (record accessors: name(), email(), phone(), tempPassword())
         User user = User.builder()
-                .name(request.getName())
-                .email(request.getEmail())
-                .phone(request.getPhone())
-                .passwordHash(passwordEncoder.encode(request.getPassword()))
+                .name(request.name())
+                .email(request.email())
+                .phone(request.phone())
+                .passwordHash(passwordEncoder.encode(request.tempPassword()))
                 .status(UserStatus.ACTIVE)
                 .failedAttempts(0)
-                .roles(new HashSet<>())
+                .roles(new java.util.HashSet<>(java.util.Set.of(role))) // single role
                 .build();
-
-        // Assign roles
-        if (request.getRoles() != null && !request.getRoles().isEmpty()) {
-            Set<Role> roles = request.getRoles().stream()
-                    .map(roleName -> roleRepository.findByName(roleName)
-                            .orElseThrow(() -> new IllegalArgumentException("Role not found: " + roleName)))
-                    .collect(Collectors.toSet());
-            user.setRoles(roles);
-        }
 
         User savedUser = userRepository.save(user);
 
-        // Audit log
+        // 4) Audit
         Long actorUserId = getCurrentUserId();
-        Map<String, Object> details = new HashMap<>();
+        java.util.Map<String, Object> details = new java.util.HashMap<>();
         details.put("name", savedUser.getName());
         details.put("email", savedUser.getEmail());
-        details.put("roles", request.getRoles());
+        details.put("roles", java.util.Set.of(role.getName())); // single role we assigned
         auditLogService.logUserCreated(actorUserId, savedUser.getId(), details);
 
+        // 5) Return response
         return mapToResponse(savedUser);
     }
+
 
     @Transactional(readOnly = true)
     public UserResponse getUser(Long id) {
@@ -80,8 +81,7 @@ public class UserManagementService {
 
     @Transactional(readOnly = true)
     public Page<UserResponse> getAllUsers(Pageable pageable) {
-        return userRepository.findAll(pageable)
-                .map(this::mapToResponse);
+        return userRepository.findAll(pageable).map(this::mapToResponse);
     }
 
     @Transactional
@@ -132,7 +132,7 @@ public class UserManagementService {
                     .collect(Collectors.toSet());
 
             Set<Role> newRoles = request.getRoles().stream()
-                    .map(roleName -> roleRepository.findByName(roleName)
+                    .map(roleName -> roleRepository.findByName(roleName.toUpperCase().trim())
                             .orElseThrow(() -> new IllegalArgumentException("Role not found: " + roleName)))
                     .collect(Collectors.toSet());
 
@@ -169,28 +169,35 @@ public class UserManagementService {
     }
 
     private UserResponse mapToResponse(User user) {
-        return UserResponse.builder()
-                .id(user.getId())
-                .name(user.getName())
-                .email(user.getEmail())
-                .phone(user.getPhone())
-                .status(user.getStatus())
-                .roles(user.getRoles().stream()
+        return new UserResponse(
+                user.getId(),
+                user.getName(),
+                user.getEmail(),
+                user.getPhone(),
+                user.getStatus(),
+                user.getRoles().stream()
                         .map(Role::getName)
-                        .collect(Collectors.toSet()))
-                .createdAt(user.getCreatedAt())
-                .updatedAt(user.getUpdatedAt())
-                .build();
+                        .collect(Collectors.toSet()),
+                user.getCreatedAt(),
+                user.getUpdatedAt()
+        );
     }
 
     private Long getCurrentUserId() {
         try {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            if (authentication != null && authentication.isAuthenticated() && !"anonymousUser".equals(authentication.getPrincipal())) {
-                String email = authentication.getName();
-                return userRepository.findByEmail(email)
-                        .map(User::getId)
-                        .orElse(null);
+            if (authentication != null && authentication.isAuthenticated()
+                    && !"anonymousUser".equals(authentication.getPrincipal())) {
+
+                Object principal = authentication.getPrincipal();
+                if (principal instanceof User u) {
+                    return u.getId(); // Our JwtAuthFilter sets principal = User
+                }
+
+                // Fallback: if principal is a String (email/username)
+                if (principal instanceof String email) {
+                    return userRepository.findByEmail(email).map(User::getId).orElse(null);
+                }
             }
         } catch (Exception e) {
             log.warn("Failed to get current user ID", e);
@@ -198,4 +205,3 @@ public class UserManagementService {
         return null;
     }
 }
-

@@ -3,6 +3,7 @@ package com.gridinsight.backend.IAM_1.security;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -11,6 +12,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity// <-- Enables @PreAuthorize annotations
 public class WebSecurityConfig {
 
     @Bean
@@ -21,14 +23,20 @@ public class WebSecurityConfig {
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
                 .authorizeHttpRequests(auth -> auth
-                        // Allow auth endpoints without a token
+                        // Allow ONLY these auth endpoints without a token
                         .requestMatchers(HttpMethod.POST,
-                                "/api/auth/register",
                                 "/api/auth/login",
                                 "/api/auth/refresh",
                                 "/api/auth/password/forgot",
                                 "/api/auth/password/reset"
                         ).permitAll()
+
+                        // IMPORTANT: Remove public register. Two options:
+
+                        // Option A (recommended): remove the /register endpoint entirely
+                        // OR
+                        // Option B: keep it but restrict to ADMIN only (if you kept the route)
+                        .requestMatchers(HttpMethod.POST, "/api/auth/register").hasRole("ADMIN")
 
                         // (Optional) docs
                         .requestMatchers(
@@ -36,17 +44,18 @@ public class WebSecurityConfig {
                                 "/v3/api-docs/**"
                         ).permitAll()
 
-                        // User management endpoints (will add RBAC in Phase 5)
-                        .requestMatchers("/api/users/**").authenticated()
+                        // Admin-only management APIs (new convention)
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
 
-                        // Audit log endpoints
+                        // Other protected APIs
+                        .requestMatchers("/api/users/**").authenticated()
                         .requestMatchers("/api/audit/**").authenticated()
 
                         // Everything else requires authentication
                         .anyRequest().authenticated()
                 )
 
-                // Your JWT filter should only authenticate when an Authorization header is present
+                // Your JWT filter should authenticate only when Authorization header is present
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
 
                 // Disable HTTP Basic for API
