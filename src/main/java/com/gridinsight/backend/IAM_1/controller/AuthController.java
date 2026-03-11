@@ -15,7 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping("/auth")
 @RequiredArgsConstructor
 public class AuthController {
 
@@ -34,7 +34,7 @@ public class AuthController {
     }
 
     // PUBLIC: Request password reset (generates a reset token)
-    @PostMapping("/password/forgot")
+    @PostMapping("/password/otp")
     public ResponseEntity<PasswordResetResponse> forgotPassword(
             @Valid @RequestBody PasswordResetRequest req,
             HttpServletRequest request) {

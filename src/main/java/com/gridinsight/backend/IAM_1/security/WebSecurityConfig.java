@@ -25,10 +25,10 @@ public class WebSecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // Allow ONLY these auth endpoints without a token
                         .requestMatchers(HttpMethod.POST,
-                                "/api/auth/login",
-                                "/api/auth/refresh",
-                                "/api/auth/password/forgot",
-                                "/api/auth/password/reset"
+                                "/auth/login",
+                                "/auth/refresh",
+                                "/auth/password/otp",
+                                "/auth/password/reset"
                         ).permitAll()
 
                         // IMPORTANT: Remove public register. Two options:
@@ -36,7 +36,7 @@ public class WebSecurityConfig {
                         // Option A (recommended): remove the /register endpoint entirely
                         // OR
                         // Option B: keep it but restrict to ADMIN only (if you kept the route)
-                        .requestMatchers(HttpMethod.POST, "/api/auth/register").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/auth/register").hasRole("ADMIN")
 
                         // (Optional) docs
                         .requestMatchers(
@@ -45,11 +45,11 @@ public class WebSecurityConfig {
                         ).permitAll()
 
                         // Admin-only management APIs (new convention)
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/admin/**").hasRole("ADMIN")
 
                         // Other protected APIs
-                        .requestMatchers("/api/users/**").authenticated()
-                        .requestMatchers("/api/audit/**").authenticated()
+                        .requestMatchers("/users/**").authenticated()
+                        .requestMatchers("/audit/**").authenticated()
 
                         // Everything else requires authentication
                         .anyRequest().authenticated()
