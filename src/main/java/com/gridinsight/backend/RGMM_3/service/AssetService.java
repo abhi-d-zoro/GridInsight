@@ -2,7 +2,10 @@ package com.gridinsight.backend.RGMM_3.service;
 
 import com.gridinsight.backend.RGMM_3.dto.AssetRequest;
 import com.gridinsight.backend.RGMM_3.dto.AssetResponse;
-import com.gridinsight.backend.RGMM_3.entity.*;
+import com.gridinsight.backend.RGMM_3.dto.MaintenanceDTO;
+import com.gridinsight.backend.RGMM_3.entity.Asset;
+import com.gridinsight.backend.RGMM_3.entity.AssetStatus;
+import com.gridinsight.backend.RGMM_3.entity.AssetType;
 import com.gridinsight.backend.RGMM_3.exception.DuplicateAssetException;
 import com.gridinsight.backend.RGMM_3.exception.InvalidStatusTransitionException;
 import com.gridinsight.backend.RGMM_3.repository.AssetRepository;
@@ -63,6 +66,21 @@ public class AssetService {
         assetRepo.deleteById(id);
     }
 
+    // --- New Feature: Flag asset under maintenance ---
+    @Transactional
+    public AssetResponse flagUnderMaintenance(Long id, MaintenanceDTO dto) {
+        Asset asset = assetRepo.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Asset not found"));
+
+        asset.setStatus(AssetStatus.UNDER_MAINTENANCE);
+        asset.setMaintenanceNote(dto.getNote());
+        asset.setMaintenanceStart(dto.getStartDate());
+        asset.setMaintenanceEnd(dto.getEndDate());
+
+        Asset updated = assetRepo.save(asset);
+        return toResponse(updated);
+    }
+
     private void validateTransition(AssetStatus current, AssetStatus next) {
         // Example: allow any transition except OPERATIONAL -> OFFLINE directly
         if (current == AssetStatus.OPERATIONAL && next == AssetStatus.OFFLINE) {
@@ -80,7 +98,10 @@ public class AssetService {
                 asset.getCommissionDate(),
                 asset.getStatus(),
                 asset.getCreatedAt(),
-                asset.getUpdatedAt()
+                asset.getUpdatedAt(),
+                asset.getMaintenanceNote(),
+                asset.getMaintenanceStart(),
+                asset.getMaintenanceEnd()
         );
     }
 }

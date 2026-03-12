@@ -20,14 +20,34 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http.csrf().disable()
+        http
+                .csrf().disable()
                 .authorizeHttpRequests(auth -> auth
+                        // Public endpoints
                         .requestMatchers("/api/auth/**").permitAll()
+
+                        // Asset endpoints: managers and admins
                         .requestMatchers("/api/assets/**").hasAnyRole("ASSET_MANAGER", "ADMIN")
+
+                        // Admin-only endpoints
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
+
+                        // Everything else requires authentication
                         .anyRequest().authenticated()
                 )
-                .addFilterBefore(rgmmJwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                // Add JWT filter before UsernamePasswordAuthenticationFilter
+                .addFilterBefore(rgmmJwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                // Let exceptions bubble up to your GlobalExceptionHandler
+                .exceptionHandling(ex -> ex
+                        .accessDeniedHandler((request, response, accessDeniedException) -> {
+                            // Delegate to GlobalExceptionHandler by rethrowing
+                            throw accessDeniedException;
+                        })
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            // Delegate to GlobalExceptionHandler by rethrowing
+                            throw authException;
+                        })
+                );
 
         return http.build();
     }

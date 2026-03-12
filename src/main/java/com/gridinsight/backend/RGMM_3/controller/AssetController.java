@@ -2,6 +2,7 @@ package com.gridinsight.backend.RGMM_3.controller;
 
 import com.gridinsight.backend.RGMM_3.dto.AssetRequest;
 import com.gridinsight.backend.RGMM_3.dto.AssetResponse;
+import com.gridinsight.backend.RGMM_3.dto.MaintenanceDTO;
 import com.gridinsight.backend.RGMM_3.entity.AssetStatus;
 import com.gridinsight.backend.RGMM_3.service.AssetService;
 import jakarta.validation.Valid;
@@ -49,5 +50,13 @@ public class AssetController {
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         assetService.deleteAsset(id);
         return ResponseEntity.noContent().build();
+    }
+
+    // --- New Feature: Flag asset under maintenance ---
+    @PreAuthorize("hasRole('ASSET_MANAGER')")
+    @PutMapping("/{id}/maintenance")
+    public ResponseEntity<AssetResponse> flagMaintenance(@PathVariable Long id,
+                                                         @RequestBody MaintenanceDTO dto) {
+        return ResponseEntity.ok(assetService.flagUnderMaintenance(id, dto));
     }
 }

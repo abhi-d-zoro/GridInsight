@@ -33,6 +33,11 @@ public class Asset {
     @Enumerated(EnumType.STRING)
     private AssetStatus status;
 
+    // --- Maintenance fields ---
+    private String maintenanceNote;
+    private LocalDate maintenanceStart;
+    private LocalDate maintenanceEnd;
+
     private Instant createdAt;
     private Instant updatedAt;
 
