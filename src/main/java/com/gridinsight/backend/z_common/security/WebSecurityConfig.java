@@ -1,4 +1,4 @@
-package com.gridinsight.backend.IAM_1.security;
+package com.gridinsight.backend.z_common.security;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -12,18 +12,27 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity// <-- Enables @PreAuthorize annotations
+@EnableMethodSecurity // Enables @PreAuthorize on controllers/services
 public class WebSecurityConfig {
 
     @Bean
     SecurityFilterChain filterChain(HttpSecurity http, JwtAuthenticationFilter jwtAuthenticationFilter) throws Exception {
         http
-                // Stateless API with JWT
+                // Stateless REST API with JWT
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
+                // Return 401 for unauthenticated, 403 for forbidden
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint((req, resp, e) -> resp.setStatus(401))
+                        .accessDeniedHandler((req, resp, e) -> resp.setStatus(403))
+                )
+
                 .authorizeHttpRequests(auth -> auth
-                        // Allow ONLY these auth endpoints without a token
+                        // ----- CORS preflight -----
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
+                        // ----- PUBLIC auth -----
                         .requestMatchers(HttpMethod.POST,
                                 "/auth/login",
                                 "/auth/refresh",
@@ -31,36 +40,46 @@ public class WebSecurityConfig {
                                 "/auth/password/reset"
                         ).permitAll()
 
-                        // IMPORTANT: Remove public register. Two options:
-
-                        // Option A (recommended): remove the /register endpoint entirely
-                        // OR
-                        // Option B: keep it but restrict to ADMIN only (if you kept the route)
+                        // (If you still expose /auth/register, lock it to ADMIN; otherwise remove this)
                         .requestMatchers(HttpMethod.POST, "/auth/register").hasRole("ADMIN")
 
-                        // (Optional) docs
+                        // ----- Swagger / OpenAPI (optional) -----
                         .requestMatchers(
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**"
                         ).permitAll()
 
-                        // Admin-only management APIs (new convention)
+                        // ----- Admin area (e.g., /admin/users/**) -----
                         .requestMatchers("/admin/**").hasRole("ADMIN")
 
-                        // Other protected APIs
-                        .requestMatchers("/users/**").authenticated()
-                        .requestMatchers("/audit/**").authenticated()
+                        // ----- Load module (LMDAM_4) -----
+                        // Read-only: GET for any authenticated user
+                        .requestMatchers(HttpMethod.GET, "/load/**").authenticated()
+                        // Mutations: POST/PUT/DELETE require ADMIN
+                        .requestMatchers("/load/**").hasRole("ADMIN")
 
-                        // Everything else requires authentication
+                        // ----- Audit -----
+                        // Method-level guards exist, but we enforce again at route level
+                        .requestMatchers("/audit/**").hasRole("ADMIN")
+
+                        // ----- Any other authenticated APIs you may add -----
+                        .requestMatchers("/users/**").authenticated()
+
+                        // ----- Everything else requires authentication -----
                         .anyRequest().authenticated()
                 )
 
-                // Your JWT filter should authenticate only when Authorization header is present
+                // Run JWT authentication before username/password filter
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
 
-                // Disable HTTP Basic for API
+                // No HTTP Basic for APIs
                 .httpBasic(httpBasic -> httpBasic.disable());
+
+        // If you need CORS for a local UI, uncomment the next line and the cors() bean below:
+        // http.cors(cors -> {});
 
         return http.build();
     }
+
+
 }

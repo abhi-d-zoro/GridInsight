@@ -7,6 +7,7 @@ import com.gridinsight.backend.IAM_1.exception.UnauthorizedException;
 import com.gridinsight.backend.IAM_1.repository.*;
 import com.gridinsight.backend.IAM_1.security.JwtService;
 import com.gridinsight.backend.IAM_1.security.TokenHasher;
+import com.gridinsight.backend.z_common.audit.AuditLogRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
