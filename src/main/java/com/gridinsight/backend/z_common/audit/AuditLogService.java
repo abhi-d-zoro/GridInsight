@@ -26,11 +26,6 @@ public class AuditLogService {
     private final AuditLogRepository auditLogRepo;
     private final ObjectMapper objectMapper;
 
-//    public AuditLogService(AuditLogRepository auditLogRepo, ObjectMapper objectMapper) {
-//        this.auditLogRepo = auditLogRepo;
-//        this.objectMapper = objectMapper;
-//    }
-
     @Transactional
     public void logUserCreated(Long actorUserId, Long targetUserId, Map<String, Object> details) {
         createAuditLog("USER_CREATED", actorUserId, targetUserId, "User", details, null);
@@ -46,13 +41,18 @@ public class AuditLogService {
         createAuditLog("USER_DELETED", actorUserId, targetUserId, "User", details, null);
     }
 
+    /** Generic action logger used by all modules. */
     @Transactional
     public void logAction(String action, Long actorUserId, Long targetUserId, String resource, Map<String, Object> metadata) {
         createAuditLog(action, actorUserId, targetUserId, resource, metadata, null);
     }
 
-    private void createAuditLog(String action, Long actorUserId, Long targetUserId, String resource,
-                                 Map<String, Object> metadata, Map<String, Object> changedFields) {
+    private void createAuditLog(String action,
+                                Long actorUserId,
+                                Long targetUserId,
+                                String resource,
+                                Map<String, Object> metadata,
+                                Map<String, Object> changedFields) {
         try {
             String ipAddress = getClientIpAddress();
             String correlationId = getOrCreateCorrelationId();
@@ -70,8 +70,8 @@ public class AuditLogService {
                     .build();
 
             auditLogRepo.save(auditLog);
-            log.info("Audit log created: action={}, actor={}, target={}, ip={}, correlationId={}",
-                    action, actorUserId, targetUserId, ipAddress, correlationId);
+            log.info("Audit log created: action={}, actor={}, target={}, resource={}, ip={}, correlationId={}",
+                    action, actorUserId, targetUserId, resource, ipAddress, correlationId);
         } catch (JsonProcessingException e) {
             log.error("Failed to serialize audit metadata", e);
         } catch (Exception e) {
@@ -80,12 +80,9 @@ public class AuditLogService {
     }
 
     public List<AuditLogResponse> getAuditLogs(Long userId, String action, String resource,
-                                                Instant fromDate, Instant toDate) {
+                                               Instant fromDate, Instant toDate) {
         List<AuditLog> logs = auditLogRepo.findByFilters(userId, action, resource, fromDate, toDate);
-
-        return logs.stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
+        return logs.stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 
     public String exportAuditLogsCsv(Long userId, String action, String resource,
@@ -115,7 +112,7 @@ public class AuditLogService {
         return AuditLogResponse.builder()
                 .id(log.getId())
                 .userId(log.getActorUserId())
-                .userEmail(null) // Will be populated via join if needed
+                .userEmail(null) // populate via join if needed later
                 .action(log.getAction())
                 .resource(log.getResource())
                 .timestamp(log.getTimestamp())
@@ -126,9 +123,7 @@ public class AuditLogService {
     }
 
     private String escapeCsv(String value) {
-        if (value == null) {
-            return "";
-        }
+        if (value == null) return "";
         if (value.contains(",") || value.contains("\"") || value.contains("\n")) {
             return "\"" + value.replace("\"", "\"\"") + "\"";
         }
@@ -138,20 +133,17 @@ public class AuditLogService {
     private String getClientIpAddress() {
         try {
             HttpServletRequest request = getCurrentRequest();
-            if (request == null) {
-                return "unknown";
-            }
+            if (request == null) return "unknown";
 
             String xForwardedFor = request.getHeader("X-Forwarded-For");
             if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
                 return xForwardedFor.split(",")[0].trim();
             }
-
             String xRealIp = request.getHeader("X-Real-IP");
             if (xRealIp != null && !xRealIp.isEmpty()) {
                 return xRealIp;
-            }
 
+            }
             return request.getRemoteAddr();
         } catch (Exception e) {
             log.warn("Failed to get client IP address", e);
@@ -167,14 +159,10 @@ public class AuditLogService {
                 if (correlationId != null && !correlationId.isEmpty()) {
                     return correlationId;
                 }
-
-                // Check if already set as request attribute
                 Object existingId = request.getAttribute("correlationId");
                 if (existingId != null) {
                     return existingId.toString();
                 }
-
-                // Generate new one and store it
                 String newId = UUID.randomUUID().toString();
                 request.setAttribute("correlationId", newId);
                 return newId;
@@ -187,7 +175,8 @@ public class AuditLogService {
 
     private HttpServletRequest getCurrentRequest() {
         try {
-            ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+            ServletRequestAttributes attributes =
+                    (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
             return attributes != null ? attributes.getRequest() : null;
         } catch (Exception e) {
             return null;
