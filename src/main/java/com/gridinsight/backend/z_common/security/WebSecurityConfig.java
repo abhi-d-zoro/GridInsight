@@ -59,7 +59,7 @@ public class WebSecurityConfig {
                         .requestMatchers("/load/**").hasRole("ADMIN")
 
                         // ----- Audit -----
-                        // Method-level guards exist, but we enforce again at route level
+                        // Method-level guards exist, but we enforce again at the route level
                         .requestMatchers("/audit/**").hasRole("ADMIN")
 
                         // ----- Any other authenticated APIs you may add -----
@@ -69,17 +69,29 @@ public class WebSecurityConfig {
                         .anyRequest().authenticated()
                 )
 
-                // Run JWT authentication before username/password filter
+                // Run JWT authentication before UsernamePasswordAuthenticationFilter
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
 
                 // No HTTP Basic for APIs
                 .httpBasic(httpBasic -> httpBasic.disable());
 
-        // If you need CORS for a local UI, uncomment the next line and the cors() bean below:
+        // If you need CORS for a local UI, uncomment the next line and the bean below:
         // http.cors(cors -> {});
 
         return http.build();
     }
 
-
+    /* Optional: simple CORS config for local frontends
+    @Bean
+    org.springframework.web.cors.CorsConfigurationSource corsConfigurationSource() {
+        var cfg = new org.springframework.web.cors.CorsConfiguration();
+        cfg.setAllowCredentials(true);
+        cfg.setAllowedOrigins(java.util.List.of("http://localhost:3000", "http://localhost:4200"));
+        cfg.setAllowedMethods(java.util.List.of("GET","POST","PUT","DELETE","PATCH","OPTIONS"));
+        cfg.setAllowedHeaders(java.util.List.of("Authorization","Content-Type","Accept","Origin","X-Requested-With"));
+        var source = new org.springframework.web.cors.UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", cfg);
+        return source;
+    }
+    */
 }
