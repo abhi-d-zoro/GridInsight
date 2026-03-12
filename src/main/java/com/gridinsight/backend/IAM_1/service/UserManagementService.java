@@ -8,6 +8,7 @@ import com.gridinsight.backend.IAM_1.entity.User;
 import com.gridinsight.backend.IAM_1.entity.UserStatus;
 import com.gridinsight.backend.IAM_1.repository.RoleRepository;
 import com.gridinsight.backend.IAM_1.repository.UserRepository;
+import com.gridinsight.backend.z_common.audit.AuditLogService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;

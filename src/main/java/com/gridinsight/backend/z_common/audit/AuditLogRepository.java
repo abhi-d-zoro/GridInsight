@@ -1,4 +1,4 @@
-package com.gridinsight.backend.IAM_1.repository;
+package com.gridinsight.backend.z_common.audit;
 
 import com.gridinsight.backend.IAM_1.entity.AuditLog;
 import org.springframework.data.jpa.repository.JpaRepository;
