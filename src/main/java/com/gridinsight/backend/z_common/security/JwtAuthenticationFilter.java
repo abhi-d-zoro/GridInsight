@@ -33,7 +33,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain filterChain)
             throws ServletException, IOException {
 
         String authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
@@ -55,22 +57,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 return;
             }
 
-            // 2) Load user (to verify ACTIVE + optionally fetch roles if token missing roles)
+            // 2) Load user (verify ACTIVE and optionally fetch roles if token missing roles)
             User user = userRepository.findById(userId).orElse(null);
             if (user == null) {
                 filterChain.doFilter(request, response);
                 return;
             }
 
-            // Enforce ACTIVE users only (revocation-by-status)
             if (user.getStatus() != UserStatus.ACTIVE) {
                 filterChain.doFilter(request, response);
                 return;
             }
 
-            // 3) Build authorities:
-            //    - Prefer roles from token (no DB hit for roles on every request)
-            //    - If token lacks roles (older tokens), fall back to DB roles
+            // 3) Build authorities
             Set<String> effectiveRoles =
                     (tokenRoles == null || tokenRoles.isEmpty())
                             ? user.getRoles().stream().map(r -> r.getName().toUpperCase().trim()).collect(Collectors.toSet())
@@ -88,7 +87,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
         } catch (Exception ignored) {
-            // Invalid/expired token? -> continue without authentication
+            // Invalid/expired token -> continue without authentication
         }
 
         filterChain.doFilter(request, response);
