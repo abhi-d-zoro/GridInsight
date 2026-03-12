@@ -15,5 +15,8 @@ public record AssetResponse(
         LocalDate commissionDate,
         AssetStatus status,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        String maintenanceNote,
+        LocalDate maintenanceStart,
+        LocalDate maintenanceEnd
 ) {}
