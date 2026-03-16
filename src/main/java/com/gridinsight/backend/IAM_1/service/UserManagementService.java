@@ -39,13 +39,21 @@ public class UserManagementService {
             throw new IllegalArgumentException("User with email " + request.email() + " already exists");
         }
 
-        // 2) Resolve the single role from DTO
-        String roleName = request.role() == null ? "" : request.role().toUpperCase().trim();
-        if (roleName.isBlank()) {
-            throw new IllegalArgumentException("Role is required");
+        // 2) Resolve the single role from DTO (PASTE THIS BLOCK HERE)
+        // --- begin pasted/updated block ---
+        String roleName = java.util.Optional.ofNullable(request.role())
+                .map(r -> r.trim().toUpperCase())
+                .filter(r -> !r.isBlank())
+                .orElse("GRIDANALYST"); // least-privilege default
+
+        java.util.Set<String> allowed = java.util.Set.of("GRID_ANALYST", "ASSET_MANAGER", "PLANNER", "ESG", "ADMIN");
+        if (!allowed.contains(roleName)) {
+            throw new IllegalArgumentException("Role not allowed: " + roleName);
         }
+
         Role role = roleRepository.findByName(roleName)
                 .orElseThrow(() -> new IllegalArgumentException("Role not found: " + roleName));
+        // --- end pasted/updated block ---
 
         // 3) Create user (record accessors: name(), email(), phone(), tempPassword())
         User user = User.builder()
