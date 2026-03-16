@@ -1,24 +1,26 @@
 package com.gridinsight.backend.IAM_1.entity;
 
-import jakarta.persistence.*;                // <-- make sure this exists
+import jakarta.persistence.*;
 import lombok.*;
-
-// If you used the VARCHAR-for-enum approach earlier:
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 
-@Entity                                   // <-- will resolve once jakarta import is present
+@Entity
 @Table(name = "users")
 @Getter @Setter
 @Builder @NoArgsConstructor @AllArgsConstructor
 public class User {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable=false) private String name;
+    @Column(nullable=false)
+    private String name;
 
     @Column(nullable=false, unique=true)
     private String email;
@@ -29,7 +31,7 @@ public class User {
     private String passwordHash;
 
     @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.VARCHAR)       // keep if you chose the VARCHAR mapping for enums
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false, length = 20)
     private UserStatus status;
 
@@ -40,28 +42,31 @@ public class User {
     @Builder.Default
     private Set<Role> roles = new HashSet<>();
 
-
     @Column(name = "created_at", nullable = false, updatable = false)
-    private java.time.Instant createdAt;
+    private Instant createdAt;
 
     @Column(name = "updated_at")
-    private java.time.Instant updatedAt;
+    private Instant updatedAt;
 
     @PrePersist
     protected void onCreate() {
-        createdAt = java.time.Instant.now();
-        updatedAt = java.time.Instant.now();
+        createdAt = Instant.now();
+        updatedAt = Instant.now();
     }
 
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = Instant.now();
+    }
 
     @Column(name = "failed_attempts", nullable = false)
     private int failedAttempts;
 
     @Column(name = "lock_until")
-    private java.time.Instant lockUntil;
+    private Instant lockUntil;
 
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = java.time.Instant.now();
+    // 🔹 Convenience methods for security integration
+    public boolean hasRole(String roleName) {
+        return roles.stream().anyMatch(r -> r.getName().equalsIgnoreCase(roleName));
     }
 }

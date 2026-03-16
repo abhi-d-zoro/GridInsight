@@ -1,4 +1,4 @@
- package com.gridinsight.backend.IAM_1.entity;
+package com.gridinsight.backend.IAM_1.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
@@ -7,10 +7,20 @@ import lombok.*;
 @Table(name = "roles")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class Role {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Store as simple uppercase strings: ADMIN, GRID_ANALYST, ASSET_MANAGER, PLANNER, ESG
+    /**
+     * Store as uppercase strings: ADMIN, ESG_ANALYST, ASSET_MANAGER, PLANNER, etc.
+     * Spring Security convention is to prefix with "ROLE_" (e.g., ROLE_ADMIN).
+     */
     @Column(name = "name", unique = true, nullable = false, length = 50)
     private String name;
+
+    // Convenience method for integration with Spring Security
+    public String getAuthority() {
+        return "ROLE_" + name.toUpperCase();
+    }
 }
