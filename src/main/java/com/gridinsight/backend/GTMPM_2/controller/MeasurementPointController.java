@@ -6,6 +6,7 @@ import com.gridinsight.backend.GTMPM_2.dto.PageResponse;
 import com.gridinsight.backend.GTMPM_2.service.MeasurementPointService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -27,8 +28,9 @@ public class MeasurementPointController {
     }
 
     @DeleteMapping("/{id}")
-    public void delete(@PathVariable Long id) {
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
         service.delete(id);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{id}")

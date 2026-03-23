@@ -182,4 +182,8 @@ public class AuditLogService {
             return null;
         }
     }
+
+    public void record(String read, String topologyZonePoints, String format) {
+
+    }
 }
