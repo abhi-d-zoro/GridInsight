@@ -7,7 +7,7 @@ import com.gridinsight.backend.GTMPM_2.entity.GridZone;
 import com.gridinsight.backend.GTMPM_2.entity.MeasurementPoint;
 import com.gridinsight.backend.GTMPM_2.entity.PointStatus;
 import com.gridinsight.backend.GTMPM_2.repository.GridZoneRepository;
-import com.gridinsight.backend.GTMPM_2.repository.MeasurementPointRepository;
+import com.gridinsight.backend.repository.MeasurementPointRepository;
 import com.gridinsight.backend.z_common.audit.AuditLogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
