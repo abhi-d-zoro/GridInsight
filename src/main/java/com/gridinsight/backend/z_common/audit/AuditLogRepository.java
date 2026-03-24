@@ -1,6 +1,6 @@
 package com.gridinsight.backend.z_common.audit;
 
-import com.gridinsight.backend.IAM_1.entity.AuditLog;
+import com.gridinsight.backend.a_iam.entity.AuditLog;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;

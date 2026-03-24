@@ -1,6 +1,6 @@
 package com.gridinsight.backend.z_common.audit;
 
-import com.gridinsight.backend.IAM_1.dto.AuditLogResponse;
+import com.gridinsight.backend.a_iam.dto.AuditLogResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;

@@ -1,9 +1,9 @@
 package com.gridinsight.backend.z_common.security;
 
-import com.gridinsight.backend.IAM_1.entity.User;
-import com.gridinsight.backend.IAM_1.entity.UserStatus;
-import com.gridinsight.backend.IAM_1.repository.UserRepository;
-import com.gridinsight.backend.IAM_1.security.JwtService;
+import com.gridinsight.backend.a_iam.entity.User;
+import com.gridinsight.backend.a_iam.entity.UserStatus;
+import com.gridinsight.backend.a_iam.repository.UserRepository;
+import com.gridinsight.backend.a_iam.security.JwtService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

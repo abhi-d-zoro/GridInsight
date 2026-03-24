@@ -2,8 +2,8 @@ package com.gridinsight.backend.z_common.audit;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.gridinsight.backend.IAM_1.dto.AuditLogResponse;
-import com.gridinsight.backend.IAM_1.entity.AuditLog;
+import com.gridinsight.backend.a_iam.dto.AuditLogResponse;
+import com.gridinsight.backend.a_iam.entity.AuditLog;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
