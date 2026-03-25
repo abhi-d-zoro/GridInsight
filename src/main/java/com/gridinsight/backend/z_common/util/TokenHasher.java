@@ -1,4 +1,4 @@
-package com.gridinsight.backend.a_iam.security;
+package com.gridinsight.backend.z_common.util;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;

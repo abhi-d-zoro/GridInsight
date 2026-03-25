@@ -1,32 +1,28 @@
 package com.gridinsight.backend.f_serm.service;
 
-import com.gridinsight.backend.f_serm.entity.SustainabilityMetric;
+import com.gridinsight.backend.f_serm.dto.SustainabilityMetricDTO;
 import com.gridinsight.backend.f_serm.entity.EnergyData;
-import com.gridinsight.backend.f_serm.repository.SustainabilityMetricRepository;
+import com.gridinsight.backend.f_serm.entity.SustainabilityMetric;
 import com.gridinsight.backend.f_serm.repository.EnergyDataRepository;
+import com.gridinsight.backend.f_serm.repository.SustainabilityMetricRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.util.List;
 
 @Service
+@RequiredArgsConstructor
 public class SustainabilityMetricService {
 
     private final SustainabilityMetricRepository metricRepo;
     private final EnergyDataRepository energyRepo;
 
-    public SustainabilityMetricService(SustainabilityMetricRepository metricRepo,
-                                       EnergyDataRepository energyRepo) {
-        this.metricRepo = metricRepo;
-        this.energyRepo = energyRepo;
-    }
+    public SustainabilityMetricDTO computeAndSaveMetric(String period) {
 
-    public SustainabilityMetric computeAndSaveMetric(String period) {
-        // 🔹 Fetch actual energy data for the given period
         EnergyData data = energyRepo.findByPeriod(period)
                 .orElseThrow(() -> new RuntimeException("No energy data found for period " + period));
 
-        // 🔹 Compute metrics based on actual values
         double renewableSharePct = (data.getRenewableGeneration() / data.getTotalGeneration()) * 100.0;
         double emissionsAvoidedTons = data.getEmissionsAvoided();
 
@@ -36,10 +32,23 @@ public class SustainabilityMetricService {
         metric.setEmissionsAvoidedTons(emissionsAvoidedTons);
         metric.setGeneratedDate(LocalDate.now());
 
-        return metricRepo.save(metric);
+        SustainabilityMetric saved = metricRepo.save(metric);
+        return toDTO(saved);
     }
 
-    public List<SustainabilityMetric> getAllMetrics() {
-        return metricRepo.findAll();
+    public List<SustainabilityMetricDTO> getAllMetrics() {
+        return metricRepo.findAll().stream()
+                .map(this::toDTO)
+                .toList();
+    }
+
+    private SustainabilityMetricDTO toDTO(SustainabilityMetric m) {
+        return SustainabilityMetricDTO.builder()
+                .metricId(m.getMetricId())
+                .period(m.getPeriod())
+                .renewableSharePct(m.getRenewableSharePct())
+                .emissionsAvoidedTons(m.getEmissionsAvoidedTons())
+                .generatedDate(m.getGeneratedDate())
+                .build();
     }
 }

@@ -1,9 +1,9 @@
 package com.gridinsight.backend.b_gtmpm.controller;
 
 import com.gridinsight.backend.b_gtmpm.dto.MeasurementPointResponseDTO;
-import com.gridinsight.backend.b_gtmpm.dto.PageResponse;
 import com.gridinsight.backend.b_gtmpm.dto.ZoneSummaryDTO;
 import com.gridinsight.backend.b_gtmpm.service.TopologyService;
+import com.gridinsight.backend.z_common.util.PageResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 

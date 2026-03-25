@@ -1,4 +1,4 @@
-package com.gridinsight.backend.a_iam.config;
+package com.gridinsight.backend.z_common.exception;
 
 import com.gridinsight.backend.a_iam.exception.AccountLockedException;
 import com.gridinsight.backend.a_iam.exception.UnauthorizedException;

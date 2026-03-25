@@ -1,8 +1,8 @@
 package com.gridinsight.backend.b_gtmpm.service;
 
 import com.gridinsight.backend.b_gtmpm.dto.MeasurementPointResponseDTO;
-import com.gridinsight.backend.b_gtmpm.dto.PageResponse;
 import com.gridinsight.backend.b_gtmpm.dto.ZoneSummaryDTO;
+import com.gridinsight.backend.z_common.util.PageResponse;
 
 public interface TopologyService {
 
