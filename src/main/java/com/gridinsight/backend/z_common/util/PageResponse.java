@@ -1,4 +1,4 @@
-package com.gridinsight.backend.b_gtmpm.dto;
+package com.gridinsight.backend.z_common.util;
 
 import lombok.Builder;
 import lombok.Data;

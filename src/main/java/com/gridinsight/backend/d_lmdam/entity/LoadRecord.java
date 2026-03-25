@@ -2,6 +2,7 @@ package com.gridinsight.backend.d_lmdam.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+
 import java.time.Instant;
 
 @Entity

@@ -1,4 +1,4 @@
-package com.gridinsight.backend.a_iam.dto;
+package com.gridinsight.backend.z_common.audit;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

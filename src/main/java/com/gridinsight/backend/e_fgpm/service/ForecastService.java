@@ -1,17 +1,13 @@
 package com.gridinsight.backend.e_fgpm.service;
 
-import com.gridinsight.backend.e_fgpm.dto.AccuracyResponse;
-import com.gridinsight.backend.e_fgpm.dto.DailyForecastDTO;
-import com.gridinsight.backend.e_fgpm.dto.HourlyComparison;
-import com.gridinsight.backend.e_fgpm.dto.MonthAheadForecastResponse;
-import com.gridinsight.backend.e_fgpm.entity.ForecastJob;
-import com.gridinsight.backend.e_fgpm.repository.ForecastJobRepository;
-
 import com.gridinsight.backend.d_lmdam.entity.LoadRecord;
 import com.gridinsight.backend.d_lmdam.repository.LoadRecordRepository;
+import com.gridinsight.backend.e_fgpm.dto.*;
+import com.gridinsight.backend.e_fgpm.entity.ForecastJob;
+import com.gridinsight.backend.e_fgpm.repository.ForecastJobRepository;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,15 +22,15 @@ import java.util.Optional;
 import java.util.Random;
 
 @Service
+@RequiredArgsConstructor
 public class ForecastService {
+
+
 
     private static final Logger log = LoggerFactory.getLogger(ForecastService.class);
 
-    @Autowired
-    private ForecastJobRepository repository;
-
-    @Autowired
-    private LoadRecordRepository loadDataRepository;
+    private final ForecastJobRepository repository;
+    private final LoadRecordRepository loadDataRepository;
 
     // ===============================================================
     // US016: Month-Ahead Generation Forecast
@@ -66,11 +62,11 @@ public class ForecastService {
     }
 
     // ===============================================================
-    // EXISTING LOGIC: Day-Ahead Load Forecast
+    // CREATE FORECAST JOB — return DTO
     // ===============================================================
-
     @Transactional
-    public ForecastJob initiateForecast(String zoneId, LocalDateTime targetDate) {
+    public ForecastJobDTO initiateForecast(String zoneId, LocalDateTime targetDate) {
+
         ForecastJob job = new ForecastJob();
         job.setZoneId(zoneId);
         job.setTargetDate(targetDate);
@@ -83,9 +79,12 @@ public class ForecastService {
         log.info("Forecast job {} created with status PENDING for zone={}, targetDate={}",
                 job.getId(), zoneId, targetDate);
 
-        return job;
+        return toDTO(job);
     }
 
+    // ===============================================================
+    // ASYNC FORECAST EXECUTION (No change)
+    // ===============================================================
     @Async("forecastExecutor")
     @Transactional
     public void executeForecastAsync(Long jobId) {
@@ -98,38 +97,36 @@ public class ForecastService {
         }
 
         try {
-            Thread.sleep(5_000);
+            Thread.sleep(5000);
 
             LocalDateTime to = job.getTargetDate();
             LocalDateTime from = to.minusDays(14);
 
-            // FIX: Convert LocalDateTime to Instant and String to Long
             Instant fromInstant = from.toInstant(ZoneOffset.UTC);
             Instant toInstant = to.toInstant(ZoneOffset.UTC);
             Long parsedZoneId = Long.valueOf(job.getZoneId());
 
-            // FIX: Match the repository method name exactly
-            List<LoadRecord> historicalData = loadDataRepository
-                    .findByZoneIdAndTimestampBetweenOrderByTimestamp(parsedZoneId, fromInstant, toInstant);
+            List<LoadRecord> historicalData =
+                    loadDataRepository.findByZoneIdAndTimestampBetweenOrderByTimestamp(
+                            parsedZoneId, fromInstant, toInstant
+                    );
 
             List<Double> forecast;
 
             if (historicalData.isEmpty()) {
-                log.warn("No historical load data found for zone={} between {} and {}. Using mock data.",
-                        job.getZoneId(), from, to);
+                log.warn("No historical load data found for zone={} — using mock data.", job.getZoneId());
                 forecast = generateMock24HourData();
             } else {
-                log.info("Fetched {} historical load records for zone={}", historicalData.size(), job.getZoneId());
                 forecast = generateForecastFromHistory(historicalData);
             }
 
             job.setHourlyForecast(forecast);
             job.setStatus("COMPLETED");
+
             log.info("Forecast job {} COMPLETED with {} hourly values", jobId, forecast.size());
 
         } catch (Exception e) {
-            log.error("Forecast job {} FAILED for zone={}, targetDate={}",
-                    jobId, job.getZoneId(), job.getTargetDate(), e);
+            log.error("Forecast job {} FAILED", jobId, e);
             job.setStatus("FAILED");
         }
 
@@ -141,15 +138,14 @@ public class ForecastService {
         int[] countByHour = new int[24];
 
         for (LoadRecord ld : history) {
-            // FIX: Extract hour correctly from Instant using UTC zone
             int hour = ld.getTimestamp().atZone(ZoneOffset.UTC).getHour();
-            // FIX: Use the correct Lombok getter
             sumByHour[hour] += ld.getDemandMW();
             countByHour[hour]++;
         }
 
         List<Double> forecast = new ArrayList<>(24);
         Random jitter = new Random();
+
         for (int h = 0; h < 24; h++) {
             if (countByHour[h] > 0) {
                 double avg = sumByHour[h] / countByHour[h];
@@ -172,60 +168,74 @@ public class ForecastService {
     }
 
     // ===============================================================
-    // US018: Calculate Forecast Accuracy (MAPE) vs Actual Load
+    // FORECAST ACCURACY — already returns DTO
     // ===============================================================
     public AccuracyResponse calculateAccuracy(String zoneId, LocalDateTime targetDate) {
-        Optional<ForecastJob> jobOpt = repository.findFirstByZoneIdAndTargetDateAndStatusOrderByCreatedAtDesc(zoneId, targetDate, "COMPLETED");
+        Optional<ForecastJob> jobOpt =
+                repository.findFirstByZoneIdAndTargetDateAndStatusOrderByCreatedAtDesc(zoneId, targetDate, "COMPLETED");
+
         if (jobOpt.isEmpty()) {
-            throw new RuntimeException("No completed forecast found for zone " + zoneId + " on date " + targetDate.toLocalDate());
+            throw new RuntimeException("No completed forecast found for zone " + zoneId);
         }
+
         ForecastJob job = jobOpt.get();
         List<Double> forecastValues = job.getHourlyForecast();
 
         LocalDateTime endOfDay = targetDate.plusDays(1).minusSeconds(1);
 
-        // FIX: Convert types for the repository call
         Long parsedZoneId = Long.valueOf(zoneId);
         Instant startInstant = targetDate.toInstant(ZoneOffset.UTC);
         Instant endInstant = endOfDay.toInstant(ZoneOffset.UTC);
 
-        // FIX: Match the repository method name exactly
-        List<LoadRecord> actuals = loadDataRepository.findByZoneIdAndTimestampBetweenOrderByTimestamp(parsedZoneId, startInstant, endInstant);
+        List<LoadRecord> actuals =
+                loadDataRepository.findByZoneIdAndTimestampBetweenOrderByTimestamp(parsedZoneId, startInstant, endInstant);
 
         double[] actualLoadByHour = new double[24];
+
         for (LoadRecord ld : actuals) {
-            // FIX: Extract hour correctly from Instant
             int hour = ld.getTimestamp().atZone(ZoneOffset.UTC).getHour();
-            // FIX: Use correct Lombok getter
             actualLoadByHour[hour] = ld.getDemandMW();
         }
 
         List<HourlyComparison> comparisons = new ArrayList<>();
-        double totalPercentageError = 0.0;
-        int validHoursCount = 0;
+        double totalError = 0.0;
+        int valid = 0;
 
         for (int i = 0; i < 24; i++) {
             double forecast = forecastValues.get(i);
             double actual = actualLoadByHour[i];
 
-            double errorPercentage = 0.0;
+            double err = 0.0;
             if (actual > 0) {
-                errorPercentage = Math.abs((actual - forecast) / actual) * 100.0;
-                totalPercentageError += errorPercentage;
-                validHoursCount++;
+                err = Math.abs((actual - forecast) / actual) * 100.0;
+                totalError += err;
+                valid++;
             }
 
-            comparisons.add(new HourlyComparison(i, Math.round(actual * 100.0) / 100.0, forecast, Math.round(errorPercentage * 100.0) / 100.0));
+            comparisons.add(new HourlyComparison(i,
+                    Math.round(actual * 100.0) / 100.0,
+                    forecast,
+                    Math.round(err * 100.0) / 100.0));
         }
 
-        double mape = validHoursCount > 0 ? (totalPercentageError / validHoursCount) : 0.0;
+        double mape = valid > 0 ? (totalError / valid) : 0.0;
 
-        AccuracyResponse response = new AccuracyResponse();
-        response.setZoneId(zoneId);
-        response.setTargetDate(targetDate.toLocalDate().toString());
-        response.setOverallMape(Math.round(mape * 100.0) / 100.0);
-        response.setHourlyData(comparisons);
+        return new AccuracyResponse(zoneId, targetDate.toLocalDate().toString(),
+                Math.round(mape * 100.0) / 100.0, comparisons);
+    }
 
-        return response;
+    // ===============================================================
+    // MAPPER — ForecastJob → ForecastJobDTO
+    // ===============================================================
+    public ForecastJobDTO toDTO(ForecastJob job) {
+        return ForecastJobDTO.builder()
+                .id(job.getId())
+                .zoneId(job.getZoneId())
+                .modelVersion(job.getModelVersion())
+                .status(job.getStatus())
+                .targetDate(job.getTargetDate())
+                .createdAt(job.getCreatedAt())
+                .hourlyForecast(job.getHourlyForecast())
+                .build();
     }
 }

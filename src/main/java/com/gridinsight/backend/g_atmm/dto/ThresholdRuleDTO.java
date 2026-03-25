@@ -2,30 +2,29 @@ package com.gridinsight.backend.g_atmm.dto;
 
 import com.gridinsight.backend.g_atmm.entity.ComparisonOperator;
 import com.gridinsight.backend.g_atmm.entity.RuleScope;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import lombok.Builder;
 import lombok.Data;
 
+import java.time.LocalDateTime;
+
 @Data
-public class ThresholdRuleRequestDTO {
+@Builder
+public class ThresholdRuleDTO {
 
-    @NotBlank
+    private Long id;
+
     private String metricName;
-
-    @NotNull
     private RuleScope scope;
 
     private Long zoneId;
     private Long assetId;
 
-    @NotNull
     private Double thresholdValue;
-
-    @NotNull
     private ComparisonOperator comparison;
 
-    @NotBlank
     private String unit;
-
     private boolean active;
+
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 }

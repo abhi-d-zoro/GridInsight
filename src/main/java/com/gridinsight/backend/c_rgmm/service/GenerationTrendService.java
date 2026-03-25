@@ -5,6 +5,9 @@ import com.gridinsight.backend.c_rgmm.dto.TrendResponseDto;
 import com.gridinsight.backend.c_rgmm.entity.GenerationRecord;
 import com.gridinsight.backend.c_rgmm.repository.GenerationRecordRepository;
 import lombok.RequiredArgsConstructor;
+import org.knowm.xchart.BitmapEncoder;
+import org.knowm.xchart.XYChart;
+import org.knowm.xchart.XYChartBuilder;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
@@ -12,8 +15,6 @@ import java.io.PrintWriter;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
-
-import org.knowm.xchart.*;
 
 @Service
 @RequiredArgsConstructor

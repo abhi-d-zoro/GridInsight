@@ -1,4 +1,4 @@
-package com.gridinsight.backend.a_iam.entity;
+package com.gridinsight.backend.z_common.audit;
 
 import jakarta.persistence.*;
 import lombok.*;

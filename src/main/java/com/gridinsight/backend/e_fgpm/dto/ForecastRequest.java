@@ -1,6 +1,7 @@
 package com.gridinsight.backend.e_fgpm.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+
 import java.time.LocalDateTime;
 
 public class ForecastRequest {

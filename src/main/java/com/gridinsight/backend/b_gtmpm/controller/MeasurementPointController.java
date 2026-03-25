@@ -2,8 +2,8 @@ package com.gridinsight.backend.b_gtmpm.controller;
 
 import com.gridinsight.backend.b_gtmpm.dto.MeasurementPointRequestDTO;
 import com.gridinsight.backend.b_gtmpm.dto.MeasurementPointResponseDTO;
-import com.gridinsight.backend.b_gtmpm.dto.PageResponse;
 import com.gridinsight.backend.b_gtmpm.service.MeasurementPointService;
+import com.gridinsight.backend.z_common.util.PageResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
