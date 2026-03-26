@@ -81,7 +81,7 @@ public class AuthService {
     @Transactional(dontRollbackOn = { UnauthorizedException.class, AccountLockedException.class })
     public LoginResponse login(LoginRequest req) {
 
-        String identifier = req.getIdentifier();
+        String identifier = req.getEmail();
         User user = userRepo.findByEmailOrPhone(identifier, identifier)
                 .orElseThrow(() -> {
                     auditLogin(null, identifier, false, "Invalid credentials"); // mirror to AuditLog too
