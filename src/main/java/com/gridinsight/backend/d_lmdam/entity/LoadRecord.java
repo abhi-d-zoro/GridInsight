@@ -2,7 +2,6 @@ package com.gridinsight.backend.d_lmdam.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-
 import java.time.Instant;
 
 @Entity
@@ -16,7 +15,7 @@ public class LoadRecord {
     private Long loadId;
 
     @Column(name = "zone_id", nullable = false)
-    private Long zoneId; // keep as FK-id (numeric) to your zone table
+    private String zoneId;    // ✅ String
 
     @Column(name = "ts_utc", nullable = false)
     private Instant timestamp;
@@ -25,7 +24,7 @@ public class LoadRecord {
     private double demandMW;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "demand_type", nullable = false, length = 16)
+    @Column(name = "demand_type", nullable = false)
     private DemandType demandType;
 
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -35,13 +34,13 @@ public class LoadRecord {
     private Instant updatedAt;
 
     @PrePersist
-    void onCreate() {
+    public void onCreate() {
         createdAt = Instant.now();
         updatedAt = createdAt;
     }
 
     @PreUpdate
-    void onUpdate() {
+    public void onUpdate() {
         updatedAt = Instant.now();
     }
 }

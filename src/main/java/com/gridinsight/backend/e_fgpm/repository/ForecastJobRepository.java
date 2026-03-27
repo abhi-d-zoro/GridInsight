@@ -10,6 +10,9 @@ import java.util.Optional;
 @Repository
 public interface ForecastJobRepository extends JpaRepository<ForecastJob, Long> {
 
-    // UPDATED: Grabs the most recent forecast if the user ran multiple forecasts for the same day
-    Optional<ForecastJob> findFirstByZoneIdAndTargetDateAndStatusOrderByCreatedAtDesc(String zoneId, LocalDateTime targetDate, String status);
+    Optional<ForecastJob> findFirstByZoneIdAndTargetDateAndStatusOrderByCreatedAtDesc(
+            String zoneId,
+            LocalDateTime targetDate,
+            String status
+    );
 }

@@ -10,14 +10,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/dashboard")
+@RequestMapping("/api/v1/dashboard")
 @RequiredArgsConstructor
 public class DashboardController {
 
     private final DashboardService service;
 
     // ✅ Only ADMIN or ESG_ANALYST can view the ESG dashboard
-    @PreAuthorize("hasAnyRole('ADMIN','ESG_ANALYST')")
+    @PreAuthorize("hasAnyRole('ADMIN','ESG')")
     @GetMapping
     public DashboardSummary getDashboard(@RequestParam(required = false) String period) {
         return service.getDashboardSummary(period);

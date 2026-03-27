@@ -2,7 +2,6 @@ package com.gridinsight.backend.d_lmdam.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-
 import java.time.Instant;
 
 @Entity
@@ -16,35 +15,35 @@ public class PeakEvent {
     private Long peakId;
 
     @Column(name = "zone_id", nullable = false)
-    private Long zoneId;
+    private String zoneId;     // ✅ String
 
-    @Column(name = "start_utc", nullable = false)
+    @Column(name = "start_time", nullable = false)
     private Instant startTime;
 
-    @Column(name = "end_utc", nullable = false)
+    @Column(name = "end_time", nullable = false)
     private Instant endTime;
 
     @Column(name = "peak_mw", nullable = false)
     private double peakMW;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "severity", nullable = false, length = 16)
+    @Column(name = "severity", nullable = false)
     private Severity severity;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
+    @Column(name = "created_at", updatable = false)
     private Instant createdAt;
 
     @Column(name = "updated_at")
     private Instant updatedAt;
 
     @PrePersist
-    void onCreate() {
+    public void preCreate() {
         createdAt = Instant.now();
         updatedAt = createdAt;
     }
 
     @PreUpdate
-    void onUpdate() {
+    public void preUpdate() {
         updatedAt = Instant.now();
     }
 }

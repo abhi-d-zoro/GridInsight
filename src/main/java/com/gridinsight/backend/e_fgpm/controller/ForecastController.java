@@ -3,12 +3,10 @@ package com.gridinsight.backend.e_fgpm.controller;
 import com.gridinsight.backend.e_fgpm.dto.*;
 import com.gridinsight.backend.e_fgpm.repository.ForecastJobRepository;
 import com.gridinsight.backend.e_fgpm.service.ForecastService;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,53 +21,59 @@ public class ForecastController {
     private final ForecastService forecastService;
     private final ForecastJobRepository repository;
 
-    // ✅ DTO: Month-ahead forecast
+
+    // -------------------------------------------------------------
+    // ✅ Month-Ahead Forecast
+    // -------------------------------------------------------------
     @PreAuthorize("hasAnyRole('PLANNER','ADMIN')")
     @GetMapping("/month-ahead")
     public ResponseEntity<MonthAheadForecastResponse> getMonthAheadForecast(
-            @RequestParam(name = "assetType") String assetType) {
+            @RequestParam String assetType) {
 
         return ResponseEntity.ok(forecastService.generateMonthAheadForecast(assetType));
     }
 
-    // ✅ DTO: Run forecast (returns ForecastJobDTO)
+
+    // -------------------------------------------------------------
+    // ✅ Run Forecast Job
+    // -------------------------------------------------------------
     @PreAuthorize("hasAnyRole('PLANNER','ADMIN')")
     @PostMapping("/run")
     public ResponseEntity<?> runForecast(@RequestBody ForecastRequest request) {
 
-        if (request.getZoneId() == null || request.getZoneId().isBlank()) {
+        if (request.getZoneId() == null) {
             return ResponseEntity.badRequest().body("zoneId is required");
         }
         if (request.getTargetDate() == null) {
-            return ResponseEntity.badRequest().body(
-                    "targetDate is required. Expected format: yyyy-MM-dd'T'HH:mm:ss"
-            );
+            return ResponseEntity.badRequest().body("targetDate is required");
         }
 
-        // ✅ Now returns ForecastJobDTO
-        ForecastJobDTO pendingJob = forecastService.initiateForecast(
-                request.getZoneId(),
-                request.getTargetDate()
-        );
+        ForecastJobDTO pendingJob =
+                forecastService.initiateForecast(request.getZoneId(), request.getTargetDate());
 
-        // Async job execution
         forecastService.executeForecastAsync(pendingJob.getId());
 
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(pendingJob);
     }
 
-    // ✅ DTO: Get forecast job status
+
+    // -------------------------------------------------------------
+    // ✅ Get Job Status
+    // -------------------------------------------------------------
     @PreAuthorize("hasAnyRole('PLANNER','ADMIN')")
     @GetMapping("/job/{id}")
     public ResponseEntity<?> getJobStatus(@PathVariable Long id) {
 
         return repository.findById(id)
-                .map(forecastService::toDTO)   // ✅ Convert entity → DTO
+                .map(forecastService::toDTO)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    // ✅ DTO: Forecast accuracy already returns DTO
+
+    // -------------------------------------------------------------
+    // ✅ Forecast Accuracy
+    // -------------------------------------------------------------
     @PreAuthorize("hasAnyRole('PLANNER','ADMIN')")
     @GetMapping("/accuracy")
     public ResponseEntity<?> getForecastAccuracy(
@@ -77,15 +81,19 @@ public class ForecastController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
 
         try {
-            LocalDateTime targetDate = date.atStartOfDay();
-            AccuracyResponse response = forecastService.calculateAccuracy(zoneId, targetDate);
+            AccuracyResponse response =
+                    forecastService.calculateAccuracy(zoneId, date.atStartOfDay());
+
             return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
         }
     }
 
-    // ✅ CSV Export unchanged
+
+    // -------------------------------------------------------------
+    // ✅ CSV Export
+    // -------------------------------------------------------------
     @PreAuthorize("hasAnyRole('PLANNER','ADMIN')")
     @GetMapping(value = "/accuracy/export", produces = "text/csv")
     public ResponseEntity<?> exportAccuracyCsv(
@@ -93,25 +101,27 @@ public class ForecastController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
 
         try {
-            LocalDateTime targetDate = date.atStartOfDay();
-            AccuracyResponse response = forecastService.calculateAccuracy(zoneId, targetDate);
+            AccuracyResponse resp =
+                    forecastService.calculateAccuracy(zoneId, date.atStartOfDay());
 
             StringBuilder csv = new StringBuilder();
+
             csv.append("Zone ID,Date,Overall MAPE (%)\n");
             csv.append(zoneId).append(",")
                     .append(date).append(",")
-                    .append(response.getOverallMape()).append("\n\n");
+                    .append(resp.getOverallMape()).append("\n\n");
 
             csv.append("Hour,Actual Load (MW),Forecast Load (MW),Error (%)\n");
-            for (HourlyComparison hc : response.getHourlyData()) {
-                csv.append(hc.getHour()).append(",")
-                        .append(hc.getActualLoad()).append(",")
-                        .append(hc.getForecastLoad()).append(",")
-                        .append(hc.getErrorPercentage()).append("\n");
+
+            for (HourlyComparison h : resp.getHourlyData()) {
+                csv.append(h.getHour()).append(",")
+                        .append(h.getActualLoad()).append(",")
+                        .append(h.getForecastLoad()).append(",")
+                        .append(h.getErrorPercentage()).append("\n");
             }
 
             HttpHeaders headers = new HttpHeaders();
-            headers.add(HttpHeaders.CONTENT_DISPOSITION,
+            headers.add("Content-Disposition",
                     "attachment; filename=forecast_accuracy_" + zoneId + "_" + date + ".csv");
 
             return ResponseEntity.ok()

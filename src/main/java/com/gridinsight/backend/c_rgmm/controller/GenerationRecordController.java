@@ -13,7 +13,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/generation")
+@RequestMapping("/api/v1/generation")
 @RequiredArgsConstructor
 public class GenerationRecordController {
 

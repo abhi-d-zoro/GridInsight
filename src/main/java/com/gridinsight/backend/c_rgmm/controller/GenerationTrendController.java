@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.LocalDateTime;
 
 @RestController
-@RequestMapping("/api/generation/trends")
+@RequestMapping("/api/v1/generation/trends")
 @RequiredArgsConstructor
 public class GenerationTrendController {
 
