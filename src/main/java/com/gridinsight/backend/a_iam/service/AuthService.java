@@ -81,6 +81,14 @@ public class AuthService {
     @Transactional(dontRollbackOn = { UnauthorizedException.class, AccountLockedException.class })
     public LoginResponse login(LoginRequest req) {
 
+        System.out.println(
+                encoder.matches(
+                        "Admin@12345",
+                        "$2a$10$FoUKiMRgiK7i79NWR2wWzeRJqMZNLTWrS.rstuh8LP6FQiDolFamC"
+                )
+        );
+
+
         String identifier = req.getEmail();
         User user = userRepo.findByEmailOrPhone(identifier, identifier)
                 .orElseThrow(() -> {
