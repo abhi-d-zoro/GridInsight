@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/admin/grid-zones")
+@RequestMapping("/api/v1/admin/grid-zones")
 @RequiredArgsConstructor
 public class GridZoneController {
 

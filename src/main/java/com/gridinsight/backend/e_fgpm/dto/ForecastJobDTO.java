@@ -11,7 +11,7 @@ import java.util.List;
 public class ForecastJobDTO {
 
     private Long id;
-    private String zoneId;
+    private Long zoneId;
     private String modelVersion;
     private String status;
     private LocalDateTime targetDate;

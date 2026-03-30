@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/admin/threshold-rules")
+@RequestMapping("/api/v1/admin/threshold-rules")
 @RequiredArgsConstructor
 public class ThresholdRuleController {
 

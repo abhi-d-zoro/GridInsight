@@ -14,7 +14,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("auth/admin/users")
+@RequestMapping("api/v1/auth/admin/users")
 @RequiredArgsConstructor
 public class AdminUserController {
 

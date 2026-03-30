@@ -1,12 +1,11 @@
 package com.gridinsight.backend.d_lmdam.dto;
 
 import com.gridinsight.backend.d_lmdam.entity.Severity;
-
 import java.time.Instant;
 
 public record PeakEventResponse(
         Long peakId,
-        Long zoneId,
+        String zoneId,
         Instant startTime,
         Instant endTime,
         double peakMW,

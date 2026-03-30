@@ -8,7 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/topology")
+@RequestMapping("/api/v1/topology")
 @RequiredArgsConstructor
 public class TopologyController {
 

@@ -2,12 +2,13 @@ package com.gridinsight.backend.d_lmdam.repository;
 
 import com.gridinsight.backend.d_lmdam.entity.DemandType;
 import com.gridinsight.backend.d_lmdam.entity.LoadRecord;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 
+import org.springframework.data.repository.query.Param;
 import java.time.Instant;
 import java.util.EnumSet;
 import java.util.List;
@@ -16,24 +17,23 @@ import java.util.Optional;
 public interface LoadRecordRepository extends JpaRepository<LoadRecord, Long> {
 
     Page<LoadRecord> findByZoneIdAndTimestampBetweenAndDemandTypeIn(
-            Long zoneId, Instant from, Instant to, EnumSet<DemandType> types, Pageable pageable);
+            String zoneId, Instant from, Instant to, EnumSet<DemandType> types, Pageable pageable);
 
     Page<LoadRecord> findByZoneIdAndTimestampBetween(
-            Long zoneId, Instant from, Instant to, Pageable pageable);
+            String zoneId, Instant from, Instant to, Pageable pageable);
 
-    Page<LoadRecord> findByZoneId(Long zoneId, Pageable pageable);
+    Page<LoadRecord> findByZoneId(String zoneId, Pageable pageable);
 
-    // ---- New: Idempotency key query
-    Optional<LoadRecord> findByZoneIdAndTimestamp(Long zoneId, Instant timestamp);
+    Optional<LoadRecord> findByZoneIdAndTimestamp(String zoneId, Instant timestamp);
 
-    // ---- New: Overlay needs time-ordered series
-    List<LoadRecord> findByZoneIdAndTimestampBetweenOrderByTimestamp(Long zoneId, Instant from, Instant to);
+    List<LoadRecord> findByZoneIdAndTimestampBetweenOrderByTimestamp(String zoneId, Instant from, Instant to);
 
-    // ---- New: rolling 15-min max
-    @Query("select max(l.demandMW) " +
-            "from LoadRecord l " +
-            "where l.zoneId = :zoneId and l.timestamp between :from and :to")
-    Double findMaxDemandInWindow(@Param("zoneId") Long zoneId,
+    @Query("""
+        select max(l.demandMW)
+        from LoadRecord l
+        where l.zoneId = :zoneId and l.timestamp between :from and :to
+    """)
+    Double findMaxDemandInWindow(@Param("zoneId") String zoneId,
                                  @Param("from") Instant from,
                                  @Param("to") Instant to);
 }

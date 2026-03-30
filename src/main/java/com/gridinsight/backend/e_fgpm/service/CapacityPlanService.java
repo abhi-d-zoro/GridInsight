@@ -7,6 +7,12 @@ import com.gridinsight.backend.e_fgpm.repository.CapacityPlanRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import com.itextpdf.text.Document;
+import com.itextpdf.text.Paragraph;
+import com.itextpdf.text.pdf.PdfWriter;
+
+import java.io.ByteArrayOutputStream;
+
 @Service
 @RequiredArgsConstructor
 public class CapacityPlanService {
@@ -38,11 +44,25 @@ public class CapacityPlanService {
         CapacityPlan plan = repository.findById(planId)
                 .orElseThrow(() -> new RuntimeException("Plan not found"));
 
-        String dummyPdfContent = "PDF Report for Zone: " + plan.getZoneId() +
-                " | Horizon: " + plan.getHorizon() +
-                " | Capacity: " + plan.getRecommendedCapacityMw() + "MW";
+        try {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            Document document = new Document();
+            PdfWriter.getInstance(document, out);
 
-        return dummyPdfContent.getBytes();
+            document.open();
+            document.add(new Paragraph("Capacity Plan Report"));
+            document.add(new Paragraph("Zone: " + plan.getZoneId()));
+            document.add(new Paragraph("Horizon: " + plan.getHorizon()));
+            document.add(new Paragraph("Recommended Capacity: " + plan.getRecommendedCapacityMw() + " MW"));
+            document.add(new Paragraph("Notes: " + plan.getNotes()));
+            document.add(new Paragraph("Plan Version: " + plan.getPlanVersion()));
+            document.add(new Paragraph("Created At: " + plan.getCreatedAt()));
+            document.close();
+
+            return out.toByteArray();
+        } catch (Exception e) {
+            throw new RuntimeException("Error generating PDF", e);
+        }
     }
 
     // ✅ ENTITY ➜ DTO MAPPER
