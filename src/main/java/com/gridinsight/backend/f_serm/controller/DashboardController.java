@@ -17,7 +17,7 @@ public class DashboardController {
     private final DashboardService service;
 
     // ✅ Only ADMIN or ESG_ANALYST can view the ESG dashboard
-    @PreAuthorize("hasAnyRole('ADMIN','ESG_ANALYST')")
+    @PreAuthorize("hasAnyRole('ADMIN','ESG')")
     @GetMapping
     public DashboardSummary getDashboard(@RequestParam(required = false) String period) {
         return service.getDashboardSummary(period);

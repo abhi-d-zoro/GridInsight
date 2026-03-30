@@ -16,14 +16,14 @@ public class SustainabilityMetricController {
     private final SustainabilityMetricService service;
 
     // ✅ Only ADMIN or ESG_ANALYST can compute sustainability metrics
-    @PreAuthorize("hasAnyRole('ADMIN','ESG_ANALYST')")
+    @PreAuthorize("hasAnyRole('ADMIN','ESG')")
     @PostMapping("/compute")
     public SustainabilityMetricDTO computeMetric(@RequestParam String period) {
         return service.computeAndSaveMetric(period);
     }
 
     // ✅ Only ADMIN or ESG_ANALYST can view sustainability metrics
-    @PreAuthorize("hasAnyRole('ADMIN','ESG_ANALYST')")
+    @PreAuthorize("hasAnyRole('ADMIN','ESG')")
     @GetMapping
     public List<SustainabilityMetricDTO> getMetrics() {
         return service.getAllMetrics();
