@@ -16,82 +16,88 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class WebSecurityConfig {
 
     @Bean
-    SecurityFilterChain filterChain(HttpSecurity http, JwtAuthenticationFilter jwtAuthenticationFilter) throws Exception {
-        http
-                // Stateless REST API with JWT
-                .csrf(csrf -> csrf.disable())
-                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+    SecurityFilterChain filterChain(
+            HttpSecurity http,
+            JwtAuthenticationFilter jwtAuthenticationFilter
+    ) throws Exception {
 
-                // Return 401 for unauthenticated, 403 for forbidden
+        http
+                // ---- Stateless REST API ----
+                .csrf(csrf -> csrf.disable())
+                .sessionManagement(sm ->
+                        sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                )
+
+                // ---- Global exception handling ----
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((req, resp, e) -> resp.setStatus(401))
                         .accessDeniedHandler((req, resp, e) -> resp.setStatus(403))
                 )
 
+                // ---- Authorization rules ----
                 .authorizeHttpRequests(auth -> auth
-                        // ----- CORS preflight -----
+
+                        // CORS preflight
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // ----- PUBLIC auth -----
+                        // ✅ ✅ PUBLIC AUTH ENDPOINTS (CRITICAL FIX)
                         .requestMatchers(HttpMethod.POST,
-                                "/auth/login",
-                                "/auth/refresh",
-                                "/auth/password/otp",
-                                "/auth/password/reset"
+                                "/api/v1/auth/login",
+                                "/api/v1/auth/refresh",
+                                "/api/v1/auth/password/otp",
+                                "/api/v1/auth/password/reset"
                         ).permitAll()
 
-                        // (If you still expose /auth/register, lock it to ADMIN; otherwise remove this)
-                        .requestMatchers(HttpMethod.POST, "/auth/register").hasRole("ADMIN")
+                        // Register allowed only for ADMIN (if enabled)
+                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/register")
+                        .hasRole("ADMIN")
 
-                        // ----- Swagger / OpenAPI (optional) -----
+                        // Swagger / OpenAPI
                         .requestMatchers(
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**"
                         ).permitAll()
 
-                        // ----- Admin area (e.g., /admin/users/**) -----
+                        // Admin-only endpoints
                         .requestMatchers("/admin/**").hasRole("ADMIN")
 
-                        // ----- Load module (LMDAM_4) -----
-                        // Read-only: GET for any authenticated user
+                        // Load module (example)
                         .requestMatchers(HttpMethod.GET, "/load/**").authenticated()
-                        // Mutations: POST/PUT/DELETE require ADMIN
-                        .requestMatchers("/load/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/load/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/load/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/load/**").hasRole("ADMIN")
 
-                        // ----- Audit -----
-                        // Method-level guards exist, but we enforce again at the route level
+                        // Audit
                         .requestMatchers("/audit/**").hasRole("ADMIN")
 
-                        // ----- Any other authenticated APIs you may add -----
-                        .requestMatchers("/users/**").authenticated()
-
-                        // ----- Everything else requires authentication -----
+                        // Any other API requires authentication
                         .anyRequest().authenticated()
                 )
 
-                // Run JWT authentication before UsernamePasswordAuthenticationFilter
+                // ---- JWT filter ----
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
 
-                // No HTTP Basic for APIs
-                .httpBasic(httpBasic -> httpBasic.disable());
-
-        // If you need CORS for a local UI, uncomment the next line and the bean below:
-        // http.cors(cors -> {});
+                // ---- Disable defaults we don’t use ----
+                .httpBasic(httpBasic -> httpBasic.disable())
+                .formLogin(form -> form.disable());
 
         return http.build();
     }
 
-    /* Optional: simple CORS config for local frontends
-    @Bean
-    org.springframework.web.cors.CorsConfigurationSource corsConfigurationSource() {
-        var cfg = new org.springframework.web.cors.CorsConfiguration();
-        cfg.setAllowCredentials(true);
-        cfg.setAllowedOrigins(java.util.List.of("http://localhost:3000", "http://localhost:4200"));
-        cfg.setAllowedMethods(java.util.List.of("GET","POST","PUT","DELETE","PATCH","OPTIONS"));
-        cfg.setAllowedHeaders(java.util.List.of("Authorization","Content-Type","Accept","Origin","X-Requested-With"));
-        var source = new org.springframework.web.cors.UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", cfg);
-        return source;
-    }
-    */
+    /*
+     * Optional CORS configuration for local frontend
+     * Enable only if calling from React/Angular directly
+     *
+     * @Bean
+     * CorsConfigurationSource corsConfigurationSource() {
+     *     var cfg = new CorsConfiguration();
+     *     cfg.setAllowCredentials(true);
+     *     cfg.setAllowedOrigins(List.of("http://localhost:5173"));
+     *     cfg.setAllowedMethods(List.of("GET","POST","PUT","DELETE","PATCH","OPTIONS"));
+     *     cfg.setAllowedHeaders(List.of("Authorization","Content-Type"));
+     *     var source = new UrlBasedCorsConfigurationSource();
+     *     source.registerCorsConfiguration("/**", cfg);
+     *     return source;
+     * }
+     */
 }
