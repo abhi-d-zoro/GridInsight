@@ -22,8 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -35,30 +33,31 @@ public class UserManagementService {
     private final PasswordEncoder passwordEncoder;
     private final AuditLogService auditLogService;
 
+    // ----------------------------------------------------------------
+    // CREATE USER (Admin only)
+    // ----------------------------------------------------------------
     @Transactional
     public UserResponse createUser(AdminCreateUserRequest request) {
-        // 1) Email uniqueness
+
+        // 1️⃣ Email uniqueness
         if (userRepository.findByEmail(request.email()).isPresent()) {
-            throw new IllegalArgumentException("User with email " + request.email() + " already exists");
+            throw new IllegalArgumentException(
+                    "User with email " + request.email() + " already exists"
+            );
         }
 
-        // 2) Resolve the single role from DTO (PASTE THIS BLOCK HERE)
-        // --- begin pasted/updated block ---
+        // 2️⃣ Resolve SINGLE role
         String roleName = java.util.Optional.ofNullable(request.role())
                 .map(r -> r.trim().toUpperCase())
                 .filter(r -> !r.isBlank())
-                .orElse("GRIDANALYST"); // least-privilege default
-
-        java.util.Set<String> allowed = java.util.Set.of("GRID_ANALYST", "ASSET_MANAGER", "PLANNER", "ESG", "ADMIN");
-        if (!allowed.contains(roleName)) {
-            throw new IllegalArgumentException("Role not allowed: " + roleName);
-        }
+                .orElse("GRID_ANALYST"); // least-privilege default
 
         Role role = roleRepository.findByName(roleName)
-                .orElseThrow(() -> new IllegalArgumentException("Role not found: " + roleName));
-        // --- end pasted/updated block ---
+                .orElseThrow(() ->
+                        new IllegalArgumentException("Role not found: " + roleName)
+                );
 
-        // 3) Create user (record accessors: name(), email(), phone(), tempPassword())
+        // 3️⃣ Create user
         User user = User.builder()
                 .name(request.name())
                 .email(request.email())
@@ -66,120 +65,187 @@ public class UserManagementService {
                 .passwordHash(passwordEncoder.encode(request.tempPassword()))
                 .status(UserStatus.ACTIVE)
                 .failedAttempts(0)
-                .roles(new java.util.HashSet<>(java.util.Set.of(role))) // single role
+                .role(role) // ✅ SINGLE ROLE
                 .build();
 
         User savedUser = userRepository.save(user);
 
-        // 4) Audit
+        // 4️⃣ Audit log
         Long actorUserId = getCurrentUserId();
-        java.util.Map<String, Object> details = new java.util.HashMap<>();
+        Map<String, Object> details = new HashMap<>();
         details.put("name", savedUser.getName());
         details.put("email", savedUser.getEmail());
-        details.put("roles", java.util.Set.of(role.getName())); // single role we assigned
+        details.put("role", role.getName());
+
         auditLogService.logUserCreated(actorUserId, savedUser.getId(), details);
 
-        // 5) Return response
+        // 5️⃣ Return response
         return mapToResponse(savedUser);
     }
 
-
+    // ----------------------------------------------------------------
+    // GET USER BY ID
+    // ----------------------------------------------------------------
     @Transactional(readOnly = true)
     public UserResponse getUser(Long id) {
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + id));
+                .orElseThrow(() ->
+                        new IllegalArgumentException("User not found with id: " + id)
+                );
         return mapToResponse(user);
     }
 
-    @Transactional(readOnly = true)
-    public Page<UserResponse> getAllUsers(Pageable pageable) {
-        return userRepository.findAll(pageable).map(this::mapToResponse);
-    }
+    // ----------------------------------------------------------------
+    // LIST / SEARCH USERS (name or email)
+    // ----------------------------------------------------------------
+        @Transactional(readOnly = true)
+        public Page<UserResponse> listUsers(String search, Pageable pageable) {
 
+            // ✅ Case 1: No search → normal paginated list
+            if (search == null || search.trim().isEmpty()) {
+                return userRepository.findAll(pageable)
+                        .map(this::mapToResponse);
+            }
+
+            // ✅ Case 2: Search by name OR email
+            return userRepository
+                    .findByNameContainingIgnoreCaseOrEmailContainingIgnoreCase(
+                            search,
+                            search,
+                            pageable
+                    )
+                    .map(this::mapToResponse);
+        }
+
+    // ----------------------------------------------------------------
+    // UPDATE USER (Partial Update)
+    // ----------------------------------------------------------------
     @Transactional
     public UserResponse updateUser(Long id, UpdateUserRequest request) {
+
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + id));
+                .orElseThrow(() ->
+                        new IllegalArgumentException("User not found with id: " + id)
+                );
 
         Map<String, Object> changedFields = new HashMap<>();
 
-        // Track changes
-        if (request.getName() != null && !request.getName().equals(user.getName())) {
-            changedFields.put("name", Map.of("old", user.getName(), "new", request.getName()));
+        // ---- Name ----
+        if (request.getName() != null &&
+                !request.getName().equals(user.getName())) {
+            changedFields.put("name",
+                    Map.of("old", user.getName(), "new", request.getName()));
             user.setName(request.getName());
         }
 
-        if (request.getEmail() != null && !request.getEmail().equals(user.getEmail())) {
-            // Check if new email is already taken
-            userRepository.findByEmail(request.getEmail()).ifPresent(existingUser -> {
-                if (!existingUser.getId().equals(id)) {
-                    throw new IllegalArgumentException("Email already in use");
-                }
-            });
-            changedFields.put("email", Map.of("old", user.getEmail(), "new", request.getEmail()));
+        // ---- Email ----
+        if (request.getEmail() != null &&
+                !request.getEmail().equals(user.getEmail())) {
+
+            userRepository.findByEmail(request.getEmail())
+                    .ifPresent(existing -> {
+                        if (!existing.getId().equals(id)) {
+                            throw new IllegalArgumentException("Email already in use");
+                        }
+                    });
+
+            changedFields.put("email",
+                    Map.of("old", user.getEmail(), "new", request.getEmail()));
             user.setEmail(request.getEmail());
         }
 
-        if (request.getPhone() != null && !Objects.equals(request.getPhone(), user.getPhone())) {
-            changedFields.put("phone", Map.of("old", user.getPhone(), "new", request.getPhone()));
+        // ---- Phone ----
+        if (request.getPhone() != null &&
+                !Objects.equals(request.getPhone(), user.getPhone())) {
+            changedFields.put("phone",
+                    Map.of("old", user.getPhone(), "new", request.getPhone()));
             user.setPhone(request.getPhone());
         }
 
-        if (request.getPassword() != null && !request.getPassword().isEmpty()) {
+        // ---- Password ----
+        if (request.getPassword() != null &&
+                !request.getPassword().isBlank()) {
             user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
-            changedFields.put("password", Map.of("old", "***", "new", "***"));
+            changedFields.put("password",
+                    Map.of("old", "***", "new", "***"));
         }
 
+        // ---- Status ----
         if (request.getStatus() != null) {
-            UserStatus newStatus = UserStatus.valueOf(request.getStatus().toUpperCase());
+            UserStatus newStatus =
+                    UserStatus.valueOf(request.getStatus().toUpperCase());
+
             if (newStatus != user.getStatus()) {
-                changedFields.put("status", Map.of("old", user.getStatus(), "new", newStatus));
+                changedFields.put("status",
+                        Map.of("old", user.getStatus(), "new", newStatus));
                 user.setStatus(newStatus);
             }
         }
 
-        if (request.getRoles() != null) {
-            Set<String> oldRoles = user.getRoles().stream()
-                    .map(Role::getName)
-                    .collect(Collectors.toSet());
+        // ✅ SINGLE ROLE UPDATE
+        if (request.getRole() != null &&
+                !request.getRole().isBlank()) {
 
-            Set<Role> newRoles = request.getRoles().stream()
-                    .map(roleName -> roleRepository.findByName(roleName.toUpperCase().trim())
-                            .orElseThrow(() -> new IllegalArgumentException("Role not found: " + roleName)))
-                    .collect(Collectors.toSet());
+            String roleName = request.getRole().trim().toUpperCase();
+            Role newRole = roleRepository.findByName(roleName)
+                    .orElseThrow(() ->
+                            new IllegalArgumentException("Role not found: " + roleName)
+                    );
 
-            if (!oldRoles.equals(request.getRoles())) {
-                changedFields.put("roles", Map.of("old", oldRoles, "new", request.getRoles()));
-                user.setRoles(newRoles);
+            if (user.getRole() == null ||
+                    !user.getRole().getName().equals(newRole.getName())) {
+
+                changedFields.put("role",
+                        Map.of(
+                                "old", user.getRole() != null ? user.getRole().getName() : null,
+                                "new", newRole.getName()
+                        ));
+
+                user.setRole(newRole);
             }
         }
 
         User updatedUser = userRepository.save(user);
 
-        // Audit log if there were changes
+        // ---- Audit if changes happened ----
         if (!changedFields.isEmpty()) {
             Long actorUserId = getCurrentUserId();
-            auditLogService.logUserUpdated(actorUserId, updatedUser.getId(), changedFields);
+            auditLogService.logUserUpdated(
+                    actorUserId,
+                    updatedUser.getId(),
+                    changedFields
+            );
         }
 
         return mapToResponse(updatedUser);
     }
 
+    // ----------------------------------------------------------------
+    // DELETE USER
+    // ----------------------------------------------------------------
     @Transactional
     public void deleteUser(Long id) {
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + id));
 
-        // Audit log before deletion
+        User user = userRepository.findById(id)
+                .orElseThrow(() ->
+                        new IllegalArgumentException("User not found with id: " + id)
+                );
+
         Long actorUserId = getCurrentUserId();
+
         Map<String, Object> details = new HashMap<>();
         details.put("name", user.getName());
         details.put("email", user.getEmail());
-        auditLogService.logUserDeleted(actorUserId, user.getId(), details);
+        details.put("role",
+                user.getRole() != null ? user.getRole().getName() : null);
 
+        auditLogService.logUserDeleted(actorUserId, user.getId(), details);
         userRepository.delete(user);
     }
 
+    // ----------------------------------------------------------------
+    // MAP ENTITY → RESPONSE
+    // ----------------------------------------------------------------
     private UserResponse mapToResponse(User user) {
         return new UserResponse(
                 user.getId(),
@@ -187,28 +253,34 @@ public class UserManagementService {
                 user.getEmail(),
                 user.getPhone(),
                 user.getStatus(),
-                user.getRoles().stream()
-                        .map(Role::getName)
-                        .collect(Collectors.toSet()),
+                user.getRole() != null ? user.getRole().getName() : null,
                 user.getCreatedAt(),
                 user.getUpdatedAt()
         );
     }
 
+    // ----------------------------------------------------------------
+    // CURRENT USER FROM SECURITY CONTEXT
+    // ----------------------------------------------------------------
     private Long getCurrentUserId() {
         try {
-            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            if (authentication != null && authentication.isAuthenticated()
-                    && !"anonymousUser".equals(authentication.getPrincipal())) {
+            Authentication authentication =
+                    SecurityContextHolder.getContext().getAuthentication();
+
+            if (authentication != null &&
+                    authentication.isAuthenticated() &&
+                    !"anonymousUser".equals(authentication.getPrincipal())) {
 
                 Object principal = authentication.getPrincipal();
+
                 if (principal instanceof User u) {
-                    return u.getId(); // Our JwtAuthFilter sets principal = User
+                    return u.getId();
                 }
 
-                // Fallback: if principal is a String (email/username)
                 if (principal instanceof String email) {
-                    return userRepository.findByEmail(email).map(User::getId).orElse(null);
+                    return userRepository.findByEmail(email)
+                            .map(User::getId)
+                            .orElse(null);
                 }
             }
         } catch (Exception e) {

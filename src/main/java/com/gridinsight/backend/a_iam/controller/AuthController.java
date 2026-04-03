@@ -46,4 +46,5 @@ public class AuthController {
         authService.resetPassword(req, request.getRemoteAddr());
         return ResponseEntity.ok().build();
     }
+
 }
