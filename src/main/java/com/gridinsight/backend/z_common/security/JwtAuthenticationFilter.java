@@ -19,7 +19,6 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -33,12 +32,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request,
-                                    HttpServletResponse response,
-                                    FilterChain filterChain)
+    protected void doFilterInternal(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            FilterChain filterChain)
             throws ServletException, IOException {
 
         String authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
+
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
@@ -47,47 +48,52 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String token = authHeader.substring(7);
 
         try {
-            // 1) Extract subject (userId) and roles from token
+            // ✅ 1. Extract userId and role info from token
             Long userId = Long.valueOf(jwtService.parseSubject(token));
-            Set<String> tokenRoles = jwtService.parseRoles(token); // may be empty if old tokens
+            Set<String> tokenRoles = jwtService.parseRoles(token);
 
-            // Avoid re-auth if already set
+            // ✅ Avoid re-authentication
             if (SecurityContextHolder.getContext().getAuthentication() != null) {
                 filterChain.doFilter(request, response);
                 return;
             }
 
-            // 2) Load user (verify ACTIVE and optionally fetch roles if token missing roles)
+            // ✅ 2. Load user from DB
             User user = userRepository.findById(userId).orElse(null);
-            if (user == null) {
+            if (user == null || user.getStatus() != UserStatus.ACTIVE) {
                 filterChain.doFilter(request, response);
                 return;
             }
 
-            if (user.getStatus() != UserStatus.ACTIVE) {
-                filterChain.doFilter(request, response);
-                return;
-            }
+            // ✅ 3. Resolve SINGLE role
+            String roleName =
+                    (tokenRoles != null && !tokenRoles.isEmpty())
+                            ? tokenRoles.iterator().next()
+                            : user.getRole().getName();
 
-            // 3) Build authorities
-            Set<String> effectiveRoles =
-                    (tokenRoles == null || tokenRoles.isEmpty())
-                            ? user.getRoles().stream().map(r -> r.getName().toUpperCase().trim()).collect(Collectors.toSet())
-                            : tokenRoles;
+            String authority = roleName.startsWith("ROLE_")
+                    ? roleName
+                    : "ROLE_" + roleName;
 
-            List<SimpleGrantedAuthority> authorities = effectiveRoles.stream()
-                    .map(r -> r.startsWith("ROLE_") ? r : "ROLE_" + r) // Spring expects ROLE_ prefix for hasRole()
-                    .map(SimpleGrantedAuthority::new)
-                    .toList();
+            List<SimpleGrantedAuthority> authorities =
+                    List.of(new SimpleGrantedAuthority(authority));
 
-            // 4) Create Authentication and store in context
+            // ✅ 4. Build Authentication
             UsernamePasswordAuthenticationToken authentication =
-                    new UsernamePasswordAuthenticationToken(user, null, authorities);
-            authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    new UsernamePasswordAuthenticationToken(
+                            user,
+                            null,
+                            authorities
+                    );
+
+            authentication.setDetails(
+                    new WebAuthenticationDetailsSource().buildDetails(request)
+            );
+
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
         } catch (Exception ignored) {
-            // Invalid/expired token -> continue without authentication
+            // Invalid or expired token → continue without authentication
         }
 
         filterChain.doFilter(request, response);

@@ -1,5 +1,7 @@
 package com.gridinsight.backend.z_common.security;
 
+import java.util.List;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -9,10 +11,13 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity // Enables @PreAuthorize on controllers/services
+@EnableMethodSecurity // Enables @PreAuthorize
 public class WebSecurityConfig {
 
     @Bean
@@ -22,6 +27,9 @@ public class WebSecurityConfig {
     ) throws Exception {
 
         http
+                // ✅ ✅ ✅ CORRECT CORS WIRING (SPRING SECURITY 6.x)
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+
                 // ---- Stateless REST API ----
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(sm ->
@@ -37,10 +45,10 @@ public class WebSecurityConfig {
                 // ---- Authorization rules ----
                 .authorizeHttpRequests(auth -> auth
 
-                        // CORS preflight
+                        // ✅ Allow CORS preflight
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // ✅ ✅ PUBLIC AUTH ENDPOINTS (CRITICAL FIX)
+                        // ✅ Public auth endpoints
                         .requestMatchers(HttpMethod.POST,
                                 "/api/v1/auth/login",
                                 "/api/v1/auth/refresh",
@@ -48,11 +56,11 @@ public class WebSecurityConfig {
                                 "/api/v1/auth/password/reset"
                         ).permitAll()
 
-                        // Register allowed only for ADMIN (if enabled)
+                        // Register allowed only for ADMIN
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/register")
                         .hasRole("ADMIN")
 
-                        // Swagger / OpenAPI
+                        // Swagger
                         .requestMatchers(
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**"
@@ -61,7 +69,7 @@ public class WebSecurityConfig {
                         // Admin-only endpoints
                         .requestMatchers("/admin/**").hasRole("ADMIN")
 
-                        // Load module (example)
+                        // Load module
                         .requestMatchers(HttpMethod.GET, "/load/**").authenticated()
                         .requestMatchers(HttpMethod.POST, "/load/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/load/**").hasRole("ADMIN")
@@ -70,34 +78,31 @@ public class WebSecurityConfig {
                         // Audit
                         .requestMatchers("/audit/**").hasRole("ADMIN")
 
-                        // Any other API requires authentication
+                        // Everything else
                         .anyRequest().authenticated()
                 )
 
                 // ---- JWT filter ----
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
 
-                // ---- Disable defaults we don’t use ----
+                // ---- Disable unused defaults ----
                 .httpBasic(httpBasic -> httpBasic.disable())
                 .formLogin(form -> form.disable());
 
         return http.build();
     }
 
-    /*
-     * Optional CORS configuration for local frontend
-     * Enable only if calling from React/Angular directly
-     *
-     * @Bean
-     * CorsConfigurationSource corsConfigurationSource() {
-     *     var cfg = new CorsConfiguration();
-     *     cfg.setAllowCredentials(true);
-     *     cfg.setAllowedOrigins(List.of("http://localhost:5173"));
-     *     cfg.setAllowedMethods(List.of("GET","POST","PUT","DELETE","PATCH","OPTIONS"));
-     *     cfg.setAllowedHeaders(List.of("Authorization","Content-Type"));
-     *     var source = new UrlBasedCorsConfigurationSource();
-     *     source.registerCorsConfiguration("/**", cfg);
-     *     return source;
-     * }
-     */
+    // ✅ ✅ ✅ GLOBAL CORS CONFIGURATION
+    @Bean
+    CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration cfg = new CorsConfiguration();
+        cfg.setAllowCredentials(true);
+        cfg.setAllowedOrigins(List.of("http://localhost:5173"));
+        cfg.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+        cfg.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", cfg);
+        return source;
+    }
 }
