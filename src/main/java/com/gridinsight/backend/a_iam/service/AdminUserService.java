@@ -1,4 +1,4 @@
- package com.gridinsight.backend.a_iam.service;
+package com.gridinsight.backend.a_iam.service;
 
 import com.gridinsight.backend.a_iam.dto.AdminCreateUserRequest;
 import com.gridinsight.backend.a_iam.dto.UserResponse;
@@ -12,8 +12,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.util.Set;
-
 @Service
 @RequiredArgsConstructor
 public class AdminUserService {
@@ -24,16 +22,23 @@ public class AdminUserService {
 
     @Transactional
     public UserResponse createUser(AdminCreateUserRequest req) {
+
+        // 1️⃣ Email uniqueness check
         if (userRepo.existsByEmail(req.email())) {
             throw new IllegalStateException("Email already in use");
         }
 
-        // Validate role name
-        String roleName = req.role().trim().toUpperCase(); // e.g., "PLANNER"
-        Role role = roleRepo.findByName(roleName)
-                .orElseThrow(() -> new IllegalArgumentException("Unknown role: " + roleName));
+        // 2️⃣ Resolve SINGLE role
+        String roleName = req.role()
+                .trim()
+                .toUpperCase(); // e.g. "ADMIN", "ESG", "PLANNER"
 
-        // Create user with that role
+        Role role = roleRepo.findByName(roleName)
+                .orElseThrow(() ->
+                        new IllegalArgumentException("Unknown role: " + roleName)
+                );
+
+        // 3️⃣ Create user with ONE role
         User user = User.builder()
                 .name(req.name())
                 .email(req.email())
@@ -42,18 +47,19 @@ public class AdminUserService {
                 .status(UserStatus.ACTIVE)
                 .failedAttempts(0)
                 .lockUntil(null)
-                .roles(Set.of(role))
+                .role(role) // ✅ SINGLE ROLE
                 .build();
 
         User saved = userRepo.save(user);
 
+        // 4️⃣ Map to response (single role)
         return new UserResponse(
                 saved.getId(),
                 saved.getName(),
                 saved.getEmail(),
                 saved.getPhone(),
-                saved.getStatus(), // <-- pass UserStatus, not String
-                saved.getRoles().stream().map(Role::getName).collect(java.util.stream.Collectors.toSet()),
+                saved.getStatus(),
+                saved.getRole().getName(),
                 saved.getCreatedAt(),
                 saved.getUpdatedAt()
         );

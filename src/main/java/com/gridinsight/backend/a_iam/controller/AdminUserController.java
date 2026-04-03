@@ -20,40 +20,65 @@ public class AdminUserController {
 
     private final UserManagementService userManagementService;
 
-    // CREATE user (Admin only)
+    // -------------------------------------------------
+    // CREATE USER
+    // -------------------------------------------------
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
-    public ResponseEntity<UserResponse> create(@Valid @RequestBody AdminCreateUserRequest req) {
+    public ResponseEntity<UserResponse> create(
+            @Valid @RequestBody AdminCreateUserRequest req
+    ) {
         UserResponse created = userManagementService.createUser(req);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
-    // LIST users (Admin only, paginated)
+    // -------------------------------------------------
+    // LIST / SEARCH USERS (✅ name/email search)
+    // -------------------------------------------------
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping
-    public ResponseEntity<Page<UserResponse>> list(Pageable pageable) {
-        return ResponseEntity.ok(userManagementService.getAllUsers(pageable));
+    public ResponseEntity<Page<UserResponse>> listUsers(
+            @RequestParam(required = false) String search,
+            Pageable pageable
+    ) {
+        return ResponseEntity.ok(
+                userManagementService.listUsers(search, pageable)
+        );
     }
 
-    // GET user by id (Admin only)
+    // -------------------------------------------------
+    // GET USER BY ID (for edit/view)
+    // -------------------------------------------------
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/{id}")
-    public ResponseEntity<UserResponse> get(@PathVariable Long id) {
+    public ResponseEntity<UserResponse> get(
+            @PathVariable Long id
+    ) {
         return ResponseEntity.ok(userManagementService.getUser(id));
     }
 
-    // UPDATE user (Admin only)
+    // -------------------------------------------------
+    // UPDATE USER
+    // -------------------------------------------------
     @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")
-    public ResponseEntity<UserResponse> update(@PathVariable Long id,
-                                               @Valid @RequestBody UpdateUserRequest req) {
-        return ResponseEntity.ok(userManagementService.updateUser(id, req));
+    public ResponseEntity<UserResponse> update(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateUserRequest req
+    ) {
+        return ResponseEntity.ok(
+                userManagementService.updateUser(id, req)
+        );
     }
 
-    // DELETE user (Admin only)
+    // -------------------------------------------------
+    // DELETE USER
+    // -------------------------------------------------
     @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
+    public ResponseEntity<Void> delete(
+            @PathVariable Long id
+    ) {
         userManagementService.deleteUser(id);
         return ResponseEntity.noContent().build();
     }
