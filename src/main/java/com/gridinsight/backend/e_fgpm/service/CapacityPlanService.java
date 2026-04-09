@@ -7,11 +7,13 @@ import com.gridinsight.backend.e_fgpm.repository.CapacityPlanRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import com.itextpdf.text.Document;
-import com.itextpdf.text.Paragraph;
-import com.itextpdf.text.pdf.PdfWriter;
-
 import java.io.ByteArrayOutputStream;
+import java.util.List;
+
+import com.itextpdf.kernel.pdf.PdfWriter;
+import com.itextpdf.kernel.pdf.PdfDocument;
+import com.itextpdf.layout.Document;
+import com.itextpdf.layout.element.Paragraph;
 
 @Service
 @RequiredArgsConstructor
@@ -19,62 +21,62 @@ public class CapacityPlanService {
 
     private final CapacityPlanRepository repository;
 
-    // ✅ Return DTO instead of entity
     public CapacityPlanDTO createCapacityPlan(CapacityPlanRequest request) {
-
         CapacityPlan plan = new CapacityPlan();
         plan.setZoneId(request.getZoneId());
         plan.setHorizon(request.getHorizon());
         plan.setRecommendedCapacityMw(request.getRecommendedCapacityMw());
         plan.setNotes(request.getNotes());
 
-        // ✅ Versioning logic unchanged
         int nextVersion = repository.findTopByZoneIdOrderByPlanVersionDesc(request.getZoneId())
-                .map(existing -> existing.getPlanVersion() + 1)
+                .map(existingPlan -> existingPlan.getPlanVersion() + 1)
                 .orElse(1);
+
         plan.setPlanVersion(nextVersion);
 
         CapacityPlan saved = repository.save(plan);
-
         return toDTO(saved);
     }
 
-    // ✅ PDF export remains unchanged — returns bytes
+    public List<CapacityPlanDTO> getAllPlans() {
+        return repository.findAll()
+                .stream()
+                .map(this::toDTO)
+                .toList();
+    }
+
+    // ✅ Generate a real PDF
     public byte[] exportPlanToPdf(Long planId) {
         CapacityPlan plan = repository.findById(planId)
                 .orElseThrow(() -> new RuntimeException("Plan not found"));
 
-        try {
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            Document document = new Document();
-            PdfWriter.getInstance(document, out);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        PdfWriter writer = new PdfWriter(baos);
+        PdfDocument pdf = new PdfDocument(writer);
+        Document document = new Document(pdf);
 
-            document.open();
-            document.add(new Paragraph("Capacity Plan Report"));
-            document.add(new Paragraph("Zone: " + plan.getZoneId()));
-            document.add(new Paragraph("Horizon: " + plan.getHorizon()));
-            document.add(new Paragraph("Recommended Capacity: " + plan.getRecommendedCapacityMw() + " MW"));
+        document.add(new Paragraph("Capacity Plan Report").setBold().setFontSize(16));
+        document.add(new Paragraph("Zone: " + plan.getZoneId()));
+        document.add(new Paragraph("Horizon: " + plan.getHorizon()));
+        document.add(new Paragraph("Capacity: " + plan.getRecommendedCapacityMw() + " MW"));
+        document.add(new Paragraph("Version: " + plan.getPlanVersion()));
+        if (plan.getNotes() != null) {
             document.add(new Paragraph("Notes: " + plan.getNotes()));
-            document.add(new Paragraph("Plan Version: " + plan.getPlanVersion()));
-            document.add(new Paragraph("Created At: " + plan.getCreatedAt()));
-            document.close();
-
-            return out.toByteArray();
-        } catch (Exception e) {
-            throw new RuntimeException("Error generating PDF", e);
         }
+
+        document.close();
+        return baos.toByteArray();
     }
 
-    // ✅ ENTITY ➜ DTO MAPPER
     private CapacityPlanDTO toDTO(CapacityPlan plan) {
-        return CapacityPlanDTO.builder()
-                .id(plan.getId())
-                .zoneId(plan.getZoneId())
-                .horizon(plan.getHorizon())
-                .recommendedCapacityMw(plan.getRecommendedCapacityMw())
-                .notes(plan.getNotes())
-                .planVersion(plan.getPlanVersion())
-                .createdAt(plan.getCreatedAt())
-                .build();
+        CapacityPlanDTO dto = new CapacityPlanDTO();
+        dto.setId(plan.getId());
+        dto.setZoneId(plan.getZoneId());
+        dto.setHorizon(plan.getHorizon());
+        dto.setRecommendedCapacityMw(plan.getRecommendedCapacityMw());
+        dto.setNotes(plan.getNotes());
+        dto.setPlanVersion(plan.getPlanVersion());
+        dto.setCreatedAt(plan.getCreatedAt());
+        return dto;
     }
 }
