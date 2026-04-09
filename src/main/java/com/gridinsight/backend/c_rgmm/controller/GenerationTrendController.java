@@ -23,7 +23,8 @@ public class GenerationTrendController {
     private final GenerationTrendService service;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('GRID_ANALYST','ADMIN')")
+    //changed by patil
+    @PreAuthorize("hasAnyRole('GRID_ANALYST','ADMIN','ASSET_MANAGER')")
     public ResponseEntity<TrendResponseDto> getTrends(
             @RequestParam String assetId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
