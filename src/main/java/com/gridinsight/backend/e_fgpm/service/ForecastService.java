@@ -5,11 +5,9 @@ import com.gridinsight.backend.d_lmdam.repository.LoadRecordRepository;
 import com.gridinsight.backend.e_fgpm.dto.*;
 import com.gridinsight.backend.e_fgpm.entity.ForecastJob;
 import com.gridinsight.backend.e_fgpm.repository.ForecastJobRepository;
-
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,67 +20,83 @@ import java.util.*;
 public class ForecastService {
 
     private static final Logger log = LoggerFactory.getLogger(ForecastService.class);
-
     private final ForecastJobRepository repository;
     private final LoadRecordRepository loadDataRepository;
 
+    // 🔹 Day-Ahead Forecast
+    public DayAheadForecastResponse generateDayAheadForecast(String zoneId, LocalDate date) {
+        LocalDateTime start = date.atStartOfDay();
+        LocalDateTime end = start.plusDays(1).minusSeconds(1);
 
-    // ---------------------------------------------------------------------
-    // ✅ MONTH-AHEAD FORECAST
-    // ---------------------------------------------------------------------
+        Instant historyStart = start.minusDays(14).toInstant(ZoneOffset.UTC);
+        Instant historyEnd = start.toInstant(ZoneOffset.UTC);
+
+        List<LoadRecord> history = loadDataRepository
+                .findByZoneIdAndTimestampBetweenOrderByTimestamp(zoneId, historyStart, historyEnd);
+
+        List<Double> forecast = history.isEmpty()
+                ? generateMock24HourData()
+                : generateForecastFromHistory(history);
+
+        Instant startInstant = start.toInstant(ZoneOffset.UTC);
+        Instant endInstant = end.toInstant(ZoneOffset.UTC);
+
+        List<LoadRecord> actualRecords = loadDataRepository
+                .findByZoneIdAndTimestampBetweenOrderByTimestamp(zoneId, startInstant, endInstant);
+
+        double[] actual = new double[24];
+        for (LoadRecord l : actualRecords) {
+            int h = l.getTimestamp().atZone(ZoneOffset.UTC).getHour();
+            actual[h] = l.getDemandMW();
+        }
+
+        List<HourlyForecastDTO> hourlyData = new ArrayList<>();
+        for (int h = 0; h < 24; h++) {
+            double fc = forecast.size() > h ? forecast.get(h) : 0.0;
+            double act = actual[h];
+            hourlyData.add(new HourlyForecastDTO(h, round(fc), round(act)));
+        }
+
+        return new DayAheadForecastResponse(zoneId, date, hourlyData);
+    }
+
+    // 🔹 Month-Ahead Forecast
     public MonthAheadForecastResponse generateMonthAheadForecast(String assetType) {
-
         List<DailyForecastDTO> daily = new ArrayList<>();
         LocalDate today = LocalDate.now();
         Random r = new Random();
-
         double base = assetType.equalsIgnoreCase("SOLAR") ? 50.0 : 120.0;
 
         for (int i = 0; i < 30; i++) {
             LocalDate d = today.plusDays(i);
-
             double val = base + (r.nextDouble() * 10 - 5);
             double low = val * 0.95;
             double high = val * 1.05;
-
             daily.add(new DailyForecastDTO(d, round(val), round(low), round(high)));
         }
-
         return new MonthAheadForecastResponse(assetType, daily);
     }
 
-
-    // ---------------------------------------------------------------------
-    // ✅ CREATE FORECAST JOB
-    // ---------------------------------------------------------------------
     @Transactional
-    public ForecastJobDTO initiateForecast(String zoneId, LocalDateTime targetDate) {
-
+    public ForecastJobDTO initiateForecast(String zoneId, LocalDate targetDate) {
         ForecastJob job = new ForecastJob();
         job.setZoneId(zoneId);
-        job.setTargetDate(targetDate.withHour(0).withMinute(0).withSecond(0));
+        job.setTargetDate(targetDate);
         job.setModelVersion("v1.0");
         job.setStatus("PENDING");
-
         job = repository.save(job);
         return toDTO(job);
     }
 
-
-    // ---------------------------------------------------------------------
-    // ✅ EXECUTE FORECAST JOB ASYNC
-    // ---------------------------------------------------------------------
     @Async("forecastExecutor")
     @Transactional
     public void executeForecastAsync(Long jobId) {
-
         ForecastJob job = repository.findById(jobId).orElse(null);
         if (job == null) return;
 
         try {
             Thread.sleep(3000);
-
-            LocalDateTime target = job.getTargetDate();
+            LocalDateTime target = job.getTargetDate().atStartOfDay();
             LocalDateTime historyStart = target.minusDays(14);
 
             Instant start = historyStart.toInstant(ZoneOffset.UTC);
@@ -97,29 +111,24 @@ public class ForecastService {
 
             job.setHourlyForecast(forecast);
             job.setStatus("COMPLETED");
-
         } catch (Exception e) {
             job.setStatus("FAILED");
         }
-
         repository.save(job);
     }
 
-
-    // ---------------------------------------------------------------------
-    // ✅ FORECAST ACCURACY
-    // ---------------------------------------------------------------------
-    public AccuracyResponse calculateAccuracy(String zoneId, LocalDateTime date) {
-
-        LocalDateTime start = date.withHour(0).withMinute(0).withSecond(0);
+    // 🔹 Accuracy Calculation
+    public AccuracyResponse calculateAccuracy(String zoneId, LocalDate date) {
+        LocalDateTime start = date.atStartOfDay();
         LocalDateTime end = start.plusDays(1).minusSeconds(1);
 
         Optional<ForecastJob> jobOpt =
                 repository.findFirstByZoneIdAndTargetDateAndStatusOrderByCreatedAtDesc(
-                        zoneId, start, "COMPLETED");
+                        zoneId, date, "COMPLETED");
 
         if (jobOpt.isEmpty()) {
-            throw new RuntimeException("No completed forecast found for zone " + zoneId);
+            // Return safe empty response instead of throwing
+            return new AccuracyResponse(zoneId, date.toString(), 0.0, Collections.emptyList());
         }
 
         ForecastJob job = jobOpt.get();
@@ -144,7 +153,7 @@ public class ForecastService {
 
         for (int h = 0; h < 24; h++) {
             double act = actual[h];
-            double fc = forecast.get(h);
+            double fc = forecast.size() > h ? forecast.get(h) : 0.0;
             double err = 0;
 
             if (act > 0) {
@@ -153,37 +162,32 @@ public class ForecastService {
                 count++;
             }
 
-            hourly.add(new HourlyComparison(h, round(act), fc, round(err)));
+            hourly.add(new HourlyComparison(h, round(act), round(fc), round(err)));
         }
 
         double mape = count > 0 ? round(totalErr / count) : 0;
-
-        return new AccuracyResponse(zoneId, start.toLocalDate().toString(), mape, hourly);
+        return new AccuracyResponse(zoneId, date.toString(), mape, hourly);
     }
 
-
-    // ---------------------------------------------------------------------
-    // ✅ Helper methods
-    // ---------------------------------------------------------------------
+    // 🔹 Helpers
     private List<Double> generateForecastFromHistory(List<LoadRecord> history) {
         double[] sum = new double[24];
         int[] cnt = new int[24];
-
         for (LoadRecord l : history) {
             int h = l.getTimestamp().atZone(ZoneOffset.UTC).getHour();
             sum[h] += l.getDemandMW();
             cnt[h]++;
         }
-
         List<Double> out = new ArrayList<>();
         Random r = new Random();
-
         for (int h = 0; h < 24; h++) {
             if (cnt[h] > 0) {
                 double avg = sum[h] / cnt[h];
                 double noise = avg * 0.05 * (r.nextDouble() - 0.5);
                 out.add(round(avg + noise));
-            } else out.add(round(100 + 400 * r.nextDouble()));
+            } else {
+                out.add(round(100 + 400 * r.nextDouble()));
+            }
         }
         return out;
     }
@@ -191,8 +195,9 @@ public class ForecastService {
     private List<Double> generateMock24HourData() {
         Random r = new Random();
         List<Double> mock = new ArrayList<>();
-        for (int i = 0; i < 24; i++)
+        for (int i = 0; i < 24; i++) {
             mock.add(round(100 + 400 * r.nextDouble()));
+        }
         return mock;
     }
 
@@ -200,10 +205,6 @@ public class ForecastService {
         return Math.round(v * 100.0) / 100.0;
     }
 
-
-    // ---------------------------------------------------------------------
-    // ✅ DTO Mapper
-    // ---------------------------------------------------------------------
     public ForecastJobDTO toDTO(ForecastJob job) {
         return ForecastJobDTO.builder()
                 .id(job.getId())
