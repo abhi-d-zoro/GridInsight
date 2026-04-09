@@ -2,6 +2,7 @@ package com.gridinsight.backend.e_fgpm.entity;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.persistence.*;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -14,13 +15,12 @@ public class ForecastJob {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String zoneId;   // ✅ String as per Method-1
-
+    private String zoneId;
     private String modelVersion;
-    private String status;   // PENDING / COMPLETED / FAILED
+    private String status;
 
-    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
-    private LocalDateTime targetDate;
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate targetDate;
 
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime createdAt;
@@ -31,8 +31,6 @@ public class ForecastJob {
     @Column(name = "load_value")
     private List<Double> hourlyForecast = new ArrayList<>();
 
-    public ForecastJob() {}
-
     @PrePersist
     public void onCreate() {
         if (createdAt == null) {
@@ -42,22 +40,16 @@ public class ForecastJob {
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
-
     public String getZoneId() { return zoneId; }
     public void setZoneId(String zoneId) { this.zoneId = zoneId; }
-
     public String getModelVersion() { return modelVersion; }
     public void setModelVersion(String modelVersion) { this.modelVersion = modelVersion; }
-
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
-
-    public LocalDateTime getTargetDate() { return targetDate; }
-    public void setTargetDate(LocalDateTime targetDate) { this.targetDate = targetDate; }
-
+    public LocalDate getTargetDate() { return targetDate; }
+    public void setTargetDate(LocalDate targetDate) { this.targetDate = targetDate; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
-
     public List<Double> getHourlyForecast() { return hourlyForecast; }
     public void setHourlyForecast(List<Double> hourlyForecast) { this.hourlyForecast = hourlyForecast; }
 }

@@ -17,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
@@ -36,14 +37,20 @@ public class AuthService {
     private final AuditLogRepository auditLogRepo;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
-    // ==== Security policies ====
+    // --------------------------------------------------
+    // Security policies
+    // --------------------------------------------------
     private static final int MAX_FAILED_ATTEMPTS = 5;
     private static final long LOCK_MINUTES = 15;
 
     private static final long ACCESS_TOKEN_TTL_SECONDS = 30 * 60;
     private static final long REFRESH_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60;
     private static final long REFRESH_IDLE_TIMEOUT_MINUTES = 30;
-    private static final long PASSWORD_RESET_TTL_SECONDS = 10 * 60;
+
+    // OTP policy
+    private static final int OTP_LENGTH = 6;
+    private static final int OTP_MAX_ATTEMPTS = 5;
+    private static final long OTP_TTL_SECONDS = 10 * 60;
 
     private static final String PASSWORD_POLICY_MESSAGE =
             "Password must be at least 8 chars and include upper, lower, number, and special character";
@@ -51,19 +58,11 @@ public class AuthService {
     private static final java.util.regex.Pattern PASSWORD_POLICY =
             java.util.regex.Pattern.compile("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z\\d]).{8,}$");
 
-    // --------------------------------------------------
+    // ==================================================
     // LOGIN
-    // --------------------------------------------------
+    // ==================================================
     @Transactional(dontRollbackOn = { UnauthorizedException.class, AccountLockedException.class })
     public LoginResponse login(LoginRequest req) {
-
-        System.out.println(
-                encoder.matches(
-                        "Admin@12345",
-                        "$2a$10$FoUKiMRgiK7i79NWR2wWzeRJqMZNLTWrS.rstuh8LP6FQiDolFamC"
-                )
-        );
-
 
         String identifier = req.getEmail();
         User user = userRepo.findByEmailOrPhone(identifier, identifier)
@@ -86,7 +85,6 @@ public class AuthService {
         resetFailedAttempts(user);
         auditLogin(user, identifier, true, null);
 
-        // ✅ SINGLE ROLE → JWT wants SET
         String roleName = user.getRole().getName();
         Set<String> roles = Set.of(roleName);
 
@@ -98,9 +96,9 @@ public class AuthService {
         return new LoginResponse(accessToken, refreshToken, "Bearer", ACCESS_TOKEN_TTL_SECONDS);
     }
 
-    // --------------------------------------------------
+    // ==================================================
     // REFRESH TOKEN
-    // --------------------------------------------------
+    // ==================================================
     @Transactional
     public RefreshResponse refresh(RefreshRequest req) {
 
@@ -137,65 +135,83 @@ public class AuthService {
         return new RefreshResponse(accessToken, newRefresh, "Bearer", ACCESS_TOKEN_TTL_SECONDS);
     }
 
-    // --------------------------------------------------
-    // PASSWORD RESET
-    // --------------------------------------------------
+    // ==================================================
+    // OTP PASSWORD RESET (REAL-WORLD FLOW)
+    // ==================================================
+
+    // STEP 1: Generate & send OTP
     @Transactional
-    public PasswordResetResponse requestPasswordReset(PasswordResetRequest req, String ipAddress) {
+    public void sendPasswordResetOtp(String email, String ipAddress) {
 
-        String identifier = req.getIdentifier();
-        var userOpt = userRepo.findByEmailOrPhone(identifier, identifier);
+        var userOpt = userRepo.findByEmail(email);
 
+        // Always return generic success response (anti-user-enumeration)
         if (userOpt.isEmpty()) {
-            auditPasswordReset(null, "PASSWORD_RESET_REQUEST",
-                    identifier, ipAddress, false, "User not found");
-            return new PasswordResetResponse(
-                    "If the account exists, a reset token has been generated.", null
-            );
+            auditPasswordReset(null, "PASSWORD_OTP_REQUEST", email, ipAddress, false, "User not found");
+            return;
         }
 
         User user = userOpt.get();
         Instant now = Instant.now();
 
-        passwordResetTokenRepo.invalidateActiveTokens(user.getId(), now, now);
+        passwordResetTokenRepo.invalidateAllOtps(user.getId(), now);
 
-        String rawToken = generateResetToken();
-        String tokenHash = TokenHasher.sha256(rawToken);
+        String otp = generateOtp();
+        String otpHash = TokenHasher.sha256(otp);
 
         PasswordResetToken token = PasswordResetToken.builder()
                 .user(user)
-                .tokenHash(tokenHash)
-                .expiresAt(now.plusSeconds(PASSWORD_RESET_TTL_SECONDS))
+                .otpHash(otpHash)
+                .expiresAt(now.plusSeconds(OTP_TTL_SECONDS))
+                .attempts(0)
                 .createdAt(now)
                 .build();
 
         passwordResetTokenRepo.save(token);
 
-        auditPasswordReset(user, "PASSWORD_RESET_REQUEST", identifier, ipAddress, true, null);
-        return new PasswordResetResponse(
-                "If the account exists, a reset token has been generated.", rawToken
-        );
+        /*
+         * TODO: Send OTP via email service
+         * emailService.sendOtp(user.getEmail(), otp);
+         */
+        System.out.println("PASSWORD RESET OTP (DEV ONLY): " + otp);
+
+        auditPasswordReset(user, "PASSWORD_OTP_SENT", email, ipAddress, true, null);
     }
 
+    // STEP 2: Verify OTP & reset password
     @Transactional
-    public void resetPassword(PasswordResetConfirmRequest req, String ipAddress) {
+    public void verifyOtpAndResetPassword(
+            PasswordResetOtpConfirmRequest req,
+            String ipAddress) {
 
-        String tokenHash = TokenHasher.sha256(req.getToken());
-        PasswordResetToken token = passwordResetTokenRepo.findByTokenHash(tokenHash)
-                .orElseThrow(() ->
-                        new IllegalArgumentException("Invalid or expired reset token")
-                );
+        User user = userRepo.findByEmail(req.getEmail())
+                .orElseThrow(() -> new IllegalArgumentException("Invalid OTP or expired"));
 
-        if (token.getUsedAt() != null || token.getExpiresAt().isBefore(Instant.now())) {
-            auditPasswordReset(token.getUser(),
-                    "PASSWORD_RESET_FAILURE", null, ipAddress, false,
-                    "Token expired or used");
-            throw new IllegalArgumentException("Invalid or expired reset token");
+        PasswordResetToken token = passwordResetTokenRepo
+                .findActiveOtpByUser(user.getId(), Instant.now())
+                .orElseThrow(() -> new IllegalArgumentException("Invalid OTP or expired"));
+
+        if (token.getAttempts() >= OTP_MAX_ATTEMPTS) {
+            auditPasswordReset(user,
+                    "PASSWORD_OTP_LOCKED", req.getEmail(), ipAddress,
+                    false, "Max attempts exceeded");
+            throw new IllegalArgumentException("OTP attempts exceeded");
+        }
+
+        String otpHash = TokenHasher.sha256(req.getOtp());
+
+        if (!otpHash.equals(token.getOtpHash())) {
+            token.setAttempts(token.getAttempts() + 1);
+            passwordResetTokenRepo.save(token);
+
+            auditPasswordReset(user,
+                    "PASSWORD_OTP_FAILURE", req.getEmail(), ipAddress,
+                    false, "Invalid OTP");
+            throw new IllegalArgumentException("Invalid OTP");
         }
 
         validatePasswordPolicy(req.getNewPassword());
 
-        User user = token.getUser();
         user.setPasswordHash(encoder.encode(req.getNewPassword()));
         userRepo.save(user);
 
@@ -203,12 +219,13 @@ public class AuthService {
         passwordResetTokenRepo.save(token);
 
         auditPasswordReset(user,
-                "PASSWORD_RESET_SUCCESS", null, ipAddress, true, null);
+                "PASSWORD_RESET_SUCCESS", req.getEmail(), ipAddress,
+                true, null);
     }
 
-    // --------------------------------------------------
+    // ==================================================
     // HELPERS
-    // --------------------------------------------------
+    // ==================================================
     private boolean isLocked(User user) {
         return user.getLockUntil() != null
                 && user.getLockUntil().isAfter(Instant.now());
@@ -248,8 +265,10 @@ public class AuthService {
         return raw;
     }
 
-    private String generateResetToken() {
-        return java.util.UUID.randomUUID() + "" + java.util.UUID.randomUUID();
+    private String generateOtp() {
+        SecureRandom random = new SecureRandom();
+        int otp = random.nextInt((int) Math.pow(10, OTP_LENGTH));
+        return String.format("%06d", otp);
     }
 
     private void validatePasswordPolicy(String password) {
@@ -258,6 +277,9 @@ public class AuthService {
         }
     }
 
+    // ==================================================
+    // AUDIT HELPERS
+    // ==================================================
     private void auditLogin(User user, String identifier, boolean success, String reason) {
 
         LoginAudit audit = LoginAudit.builder()
