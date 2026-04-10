@@ -11,6 +11,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.gridinsight.backend.e_fgpm.entity.MonthForecastRecord;
+import com.gridinsight.backend.e_fgpm.repository.MonthForecastRepository;
+
 
 import java.time.*;
 import java.util.*;
@@ -22,6 +25,7 @@ public class ForecastService {
     private static final Logger log = LoggerFactory.getLogger(ForecastService.class);
     private final ForecastJobRepository repository;
     private final LoadRecordRepository loadDataRepository;
+    private final MonthForecastRepository monthForecastRepository;
 
     // 🔹 Day-Ahead Forecast
     public DayAheadForecastResponse generateDayAheadForecast(String zoneId, LocalDate date) {
@@ -61,21 +65,22 @@ public class ForecastService {
     }
 
     // 🔹 Month-Ahead Forecast
+    // 🔹 Month-Ahead Forecast (database-driven)
     public MonthAheadForecastResponse generateMonthAheadForecast(String assetType) {
-        List<DailyForecastDTO> daily = new ArrayList<>();
-        LocalDate today = LocalDate.now();
-        Random r = new Random();
-        double base = assetType.equalsIgnoreCase("SOLAR") ? 50.0 : 120.0;
+        List<MonthForecastRecord> records = monthForecastRepository
+                .findByAssetTypeOrderByForecastDateAsc(assetType);
 
-        for (int i = 0; i < 30; i++) {
-            LocalDate d = today.plusDays(i);
-            double val = base + (r.nextDouble() * 10 - 5);
-            double low = val * 0.95;
-            double high = val * 1.05;
-            daily.add(new DailyForecastDTO(d, round(val), round(low), round(high)));
-        }
+        List<DailyForecastDTO> daily = records.stream()
+                .map(r -> new DailyForecastDTO(
+                        r.getForecastDate(),
+                        round(r.getForecastValue()),
+                        round(r.getLowerBound()),
+                        round(r.getUpperBound())))
+                .toList();
+
         return new MonthAheadForecastResponse(assetType, daily);
     }
+
 
     @Transactional
     public ForecastJobDTO initiateForecast(String zoneId, LocalDate targetDate) {
