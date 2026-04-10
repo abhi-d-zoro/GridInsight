@@ -60,4 +60,13 @@ public class AssetController {
                                                          @RequestBody MaintenanceDTO dto) {
         return ResponseEntity.ok(assetService.flagUnderMaintenance(id, dto));
     }
+
+    //patil
+    // --- New Feature: Resolve Maintenance ---
+    @PreAuthorize("hasRole('ASSET_MANAGER') or hasRole('ADMIN')")
+    @PutMapping("/{id}/resolve")
+    public ResponseEntity<AssetResponse> resolveMaintenance(@PathVariable Long id) {
+        return ResponseEntity.ok(assetService.resolveMaintenance(id));
+    }
+    //patil
 }
