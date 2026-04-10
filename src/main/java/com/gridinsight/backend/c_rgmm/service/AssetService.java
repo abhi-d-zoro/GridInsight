@@ -81,6 +81,26 @@ public class AssetService {
         return toResponse(updated);
     }
 
+    //patil
+    // --- New Feature: Resolve Maintenance ---
+    @Transactional
+    public AssetResponse resolveMaintenance(Long id) {
+        Asset asset = assetRepo.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Asset not found"));
+
+        // Set back to operational
+        asset.setStatus(AssetStatus.OPERATIONAL);
+
+        // Clear the maintenance details
+        asset.setMaintenanceNote(null);
+        asset.setMaintenanceStart(null);
+        asset.setMaintenanceEnd(null);
+
+        Asset updated = assetRepo.save(asset);
+        return toResponse(updated);
+    }
+    //patil
+
     private void validateTransition(AssetStatus current, AssetStatus next) {
         // Example: allow any transition except OPERATIONAL -> OFFLINE directly
         if (current == AssetStatus.OPERATIONAL && next == AssetStatus.OFFLINE) {
