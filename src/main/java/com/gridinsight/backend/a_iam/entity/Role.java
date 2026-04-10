@@ -13,7 +13,7 @@ public class Role {
     private Long id;
 
     /**
-     * Store as uppercase strings: ADMIN, ESG_ANALYST, ASSET_MANAGER, PLANNER, etc.
+     * Store as uppercase strings: ADMIN, ESG, ASSET_MANAGER, PLANNER, etc.
      * Spring Security convention is to prefix with "ROLE_" (e.g., ROLE_ADMIN).
      */
     @Column(name = "name", unique = true, nullable = false, length = 50)

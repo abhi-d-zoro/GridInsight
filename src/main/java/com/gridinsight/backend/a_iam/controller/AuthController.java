@@ -6,44 +6,69 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("api/v1/auth")
+@RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
 public class AuthController {
 
     private final AuthService authService;
 
+    // --------------------------------------------------
     // PUBLIC: Login
+    // --------------------------------------------------
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest req) {
+    public ResponseEntity<LoginResponse> login(
+            @Valid @RequestBody LoginRequest req) {
         return ResponseEntity.ok(authService.login(req));
     }
 
+    // --------------------------------------------------
     // PUBLIC: Refresh access token
+    // --------------------------------------------------
     @PostMapping("/refresh")
-    public ResponseEntity<RefreshResponse> refresh(@Valid @RequestBody RefreshRequest req) {
+    public ResponseEntity<RefreshResponse> refresh(
+            @Valid @RequestBody RefreshRequest req) {
         return ResponseEntity.ok(authService.refresh(req));
     }
 
-    // PUBLIC: Request password reset (generates a reset token)
+    // --------------------------------------------------
+    // PUBLIC: Forgot password → Send OTP to email
+    // --------------------------------------------------
     @PostMapping("/password/otp")
-    public ResponseEntity<PasswordResetResponse> forgotPassword(
-            @Valid @RequestBody PasswordResetRequest req,
-            HttpServletRequest request) {
-        return ResponseEntity.ok(authService.requestPasswordReset(req, request.getRemoteAddr()));
+    public ResponseEntity<MessageResponse> requestPasswordOtp(
+            @Valid @RequestBody PasswordOtpRequest req,
+            HttpServletRequest httpRequest) {
+
+        authService.sendPasswordResetOtp(
+                req.getEmail(),
+                httpRequest.getRemoteAddr()
+        );
+
+        // ✅ Always return generic message
+        return ResponseEntity.ok(
+                new MessageResponse(
+                        "If the account exists, an OTP has been sent to your email."
+                )
+        );
     }
 
-    // PUBLIC: Confirm password reset using the reset token
+    // --------------------------------------------------
+    // PUBLIC: Verify OTP + Reset password
+    // --------------------------------------------------
     @PostMapping("/password/reset")
-    public ResponseEntity<Void> resetPassword(
-            @Valid @RequestBody PasswordResetConfirmRequest req,
-            HttpServletRequest request) {
-        authService.resetPassword(req, request.getRemoteAddr());
-        return ResponseEntity.ok().build();
+    public ResponseEntity<MessageResponse> resetPassword(
+            @Valid @RequestBody PasswordResetOtpConfirmRequest req,
+            HttpServletRequest httpRequest) {
+
+        authService.verifyOtpAndResetPassword(
+                req,
+                httpRequest.getRemoteAddr()
+        );
+
+        return ResponseEntity.ok(
+                new MessageResponse("Password reset successful.")
+        );
     }
 }

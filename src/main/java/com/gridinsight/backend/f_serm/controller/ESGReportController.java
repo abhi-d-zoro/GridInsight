@@ -17,28 +17,28 @@ public class ESGReportController {
     private final ESGReportService service;
 
     // ✅ Only ADMIN or ESG_ANALYST can create ESG reports
-    @PreAuthorize("hasAnyRole('ADMIN','ESG_ANALYST')")
+    @PreAuthorize("hasAnyRole('ADMIN','ESG')")
     @PostMapping
     public ESGReportDTO createReport(@RequestBody ESGReport report) {
         return service.saveReport(report);
     }
 
     // ✅ Only ADMIN or ESG_ANALYST can view all reports
-    @PreAuthorize("hasAnyRole('ADMIN','ESG_ANALYST')")
+    @PreAuthorize("hasAnyRole('ADMIN','ESG')")
     @GetMapping
     public List<ESGReportDTO> getReports() {
         return service.getAllReports();
     }
 
     // ✅ CSV export does NOT return DTO (it returns file content as String)
-    @PreAuthorize("hasAnyRole('ADMIN','ESG_ANALYST')")
+    @PreAuthorize("hasAnyRole('ADMIN','ESG')")
     @GetMapping("/{id}/export/csv")
     public String exportReportCSV(@PathVariable Long id) {
         return service.exportReportAsCSV(id);
     }
 
     // ✅ PDF export also returns placeholder string (NOT a DTO)
-    @PreAuthorize("hasAnyRole('ADMIN','ESG_ANALYST')")
+    @PreAuthorize("hasAnyRole('ADMIN','ESG')")
     @GetMapping("/{id}/export/pdf")
     public String exportReportPDF(@PathVariable Long id) {
         return service.exportReportAsPDF(id);

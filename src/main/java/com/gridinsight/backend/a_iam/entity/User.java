@@ -6,28 +6,29 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
-import java.util.HashSet;
-import java.util.Set;
 
 @Entity
 @Table(name = "users")
-@Getter @Setter
-@Builder @NoArgsConstructor @AllArgsConstructor
+@Getter
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class User {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable=false)
+    @Column(nullable = false)
     private String name;
 
-    @Column(nullable=false, unique=true)
+    @Column(nullable = false, unique = true)
     private String email;
 
     private String phone;
 
-    @Column(name="password_hash", nullable=false)
+    @Column(name = "password_hash", nullable = false)
     private String passwordHash;
 
     @Enumerated(EnumType.STRING)
@@ -35,12 +36,12 @@ public class User {
     @Column(nullable = false, length = 20)
     private UserStatus status;
 
-    @ManyToMany(fetch = FetchType.EAGER)
-    @JoinTable(name = "user_roles",
-            joinColumns = @JoinColumn(name = "user_id"),
-            inverseJoinColumns = @JoinColumn(name = "role_id"))
-    @Builder.Default
-    private Set<Role> roles = new HashSet<>();
+    /**
+     * ✅ SINGLE ROLE PER USER
+     */
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "role_id", nullable = false)
+    private Role role;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -48,6 +49,15 @@ public class User {
     @Column(name = "updated_at")
     private Instant updatedAt;
 
+    @Column(name = "failed_attempts", nullable = false)
+    private int failedAttempts;
+
+    @Column(name = "lock_until")
+    private Instant lockUntil;
+
+    // ----------------------------------------------------------------
+    // Entity lifecycle hooks
+    // ----------------------------------------------------------------
     @PrePersist
     protected void onCreate() {
         createdAt = Instant.now();
@@ -59,14 +69,10 @@ public class User {
         updatedAt = Instant.now();
     }
 
-    @Column(name = "failed_attempts", nullable = false)
-    private int failedAttempts;
-
-    @Column(name = "lock_until")
-    private Instant lockUntil;
-
-    // 🔹 Convenience methods for security integration
+    // ----------------------------------------------------------------
+    // Convenience method for Spring Security / role checks
+    // ----------------------------------------------------------------
     public boolean hasRole(String roleName) {
-        return roles.stream().anyMatch(r -> r.getName().equalsIgnoreCase(roleName));
+        return role != null && role.getName().equalsIgnoreCase(roleName);
     }
 }
