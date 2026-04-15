@@ -4,13 +4,16 @@ import java.time.LocalDate;
 
 public class DailyForecastDTO {
     private LocalDate date;
-    private double forecastValueMW;
+    private Double forecastValueMW;              // ✅ Changed to Double
     private Double confidenceIntervalLower;
     private Double confidenceIntervalUpper;
 
     public DailyForecastDTO() {}
 
-    public DailyForecastDTO(LocalDate date, double forecastValueMW, Double confidenceIntervalLower, Double confidenceIntervalUpper) {
+    public DailyForecastDTO(LocalDate date,
+                            Double forecastValueMW,
+                            Double confidenceIntervalLower,
+                            Double confidenceIntervalUpper) {
         this.date = date;
         this.forecastValueMW = forecastValueMW;
         this.confidenceIntervalLower = confidenceIntervalLower;
@@ -25,11 +28,11 @@ public class DailyForecastDTO {
         this.date = date;
     }
 
-    public double getForecastValueMW() {
+    public Double getForecastValueMW() {
         return forecastValueMW;
     }
 
-    public void setForecastValueMW(double forecastValueMW) {
+    public void setForecastValueMW(Double forecastValueMW) {
         this.forecastValueMW = forecastValueMW;
     }
 

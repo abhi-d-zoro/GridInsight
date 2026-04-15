@@ -9,6 +9,16 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import com.gridinsight.backend.e_fgpm.entity.MonthForecastRecord;
+import com.gridinsight.backend.e_fgpm.repository.MonthForecastRepository;
+
+// Spring Web + HTTP
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+
+
 
 import java.time.LocalDate;
 import java.util.List;
@@ -21,6 +31,7 @@ public class ForecastController {
 
     private final ForecastService forecastService;
     private final ForecastJobRepository repository;
+    private final MonthForecastRepository monthForecastRepository;
 
     // 🔹 Jobs Endpoints
     @PreAuthorize("hasAnyRole('PLANNER','ADMIN')")
@@ -78,6 +89,16 @@ public class ForecastController {
             @RequestParam String assetType) {
         return ResponseEntity.ok(forecastService.generateMonthAheadForecast(assetType));
     }
+
+    @PreAuthorize("hasAnyRole('PLANNER','ADMIN')")
+    @PostMapping("/month-ahead")
+    public ResponseEntity<MonthForecastRecord> insertMonthAheadForecast(
+            @RequestBody MonthForecastRecord record) {
+        MonthForecastRecord saved = forecastService.saveMonthForecast(record); // ✅ use service
+        return ResponseEntity.status(HttpStatus.CREATED).body(saved);
+    }
+
+
 
     // 🔹 Run Forecast Job
     @PreAuthorize("hasAnyRole('PLANNER','ADMIN')")
