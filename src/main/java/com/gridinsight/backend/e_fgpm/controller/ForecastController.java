@@ -98,8 +98,6 @@ public class ForecastController {
         return ResponseEntity.status(HttpStatus.CREATED).body(saved);
     }
 
-
-
     // 🔹 Run Forecast Job
     @PreAuthorize("hasAnyRole('PLANNER','ADMIN')")
     @PostMapping("/run")
