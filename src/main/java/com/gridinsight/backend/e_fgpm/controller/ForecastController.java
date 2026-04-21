@@ -11,6 +11,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import com.gridinsight.backend.e_fgpm.entity.MonthForecastRecord;
 import com.gridinsight.backend.e_fgpm.repository.MonthForecastRepository;
+import com.gridinsight.backend.e_fgpm.dto.ManualForecastRequest;
 
 // Spring Web + HTTP
 import org.springframework.http.HttpStatus;
@@ -97,8 +98,6 @@ public class ForecastController {
         MonthForecastRecord saved = forecastService.saveMonthForecast(record); // ✅ use service
         return ResponseEntity.status(HttpStatus.CREATED).body(saved);
     }
-
-
 
     // 🔹 Run Forecast Job
     @PreAuthorize("hasAnyRole('PLANNER','ADMIN')")

@@ -25,11 +25,9 @@ public class ForecastJob {
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime createdAt;
 
-    @ElementCollection(fetch = FetchType.EAGER)
-    @CollectionTable(name = "forecast_hourly_results", joinColumns = @JoinColumn(name = "job_id"))
-    @OrderColumn(name = "hour_index")
-    @Column(name = "load_value")
-    private List<Double> hourlyForecast = new ArrayList<>();
+    // ✅ Replace List<Double> with proper entity mapping
+    @OneToMany(mappedBy = "job", cascade = CascadeType.ALL, fetch = FetchType.EAGER, orphanRemoval = true)
+    private List<ForecastHourlyResult> hourlyForecasts = new ArrayList<>();
 
     @PrePersist
     public void onCreate() {
@@ -38,18 +36,25 @@ public class ForecastJob {
         }
     }
 
+    // Getters and setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
+
     public String getZoneId() { return zoneId; }
     public void setZoneId(String zoneId) { this.zoneId = zoneId; }
+
     public String getModelVersion() { return modelVersion; }
     public void setModelVersion(String modelVersion) { this.modelVersion = modelVersion; }
+
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
+
     public LocalDate getTargetDate() { return targetDate; }
     public void setTargetDate(LocalDate targetDate) { this.targetDate = targetDate; }
+
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
-    public List<Double> getHourlyForecast() { return hourlyForecast; }
-    public void setHourlyForecast(List<Double> hourlyForecast) { this.hourlyForecast = hourlyForecast; }
+
+    public List<ForecastHourlyResult> getHourlyForecasts() { return hourlyForecasts; }
+    public void setHourlyForecasts(List<ForecastHourlyResult> hourlyForecasts) { this.hourlyForecasts = hourlyForecasts; }
 }

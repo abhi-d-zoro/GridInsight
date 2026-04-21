@@ -10,10 +10,10 @@ import java.util.List;
 @Builder
 public class ForecastJobDTO {
     private Long id;
-    private Long zoneId;
+    private String zoneId;
     private String modelVersion;
     private String status;
     private LocalDate targetDate;
     private LocalDateTime createdAt;
-    private List<Double> hourlyForecast;
+    private List<HourlyForecastDTO> hourlyForecast;
 }

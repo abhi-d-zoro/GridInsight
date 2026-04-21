@@ -4,6 +4,7 @@ import com.gridinsight.backend.d_lmdam.entity.LoadRecord;
 import com.gridinsight.backend.d_lmdam.repository.LoadRecordRepository;
 import com.gridinsight.backend.e_fgpm.dto.*;
 import com.gridinsight.backend.e_fgpm.entity.ForecastJob;
+import com.gridinsight.backend.e_fgpm.entity.ForecastHourlyResult;
 import com.gridinsight.backend.e_fgpm.entity.MonthForecastRecord;
 import com.gridinsight.backend.e_fgpm.repository.ForecastJobRepository;
 import com.gridinsight.backend.e_fgpm.repository.MonthForecastRepository;
@@ -13,6 +14,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.stream.Collectors;
+
 
 import java.time.*;
 import java.util.*;
@@ -133,7 +136,16 @@ public class ForecastService {
             List<Double> forecast =
                     history.isEmpty() ? generateMock24HourData() : generateForecastFromHistory(history);
 
-            job.setHourlyForecast(forecast);
+            List<ForecastHourlyResult> hourlyResults = new ArrayList<>();
+            for (int h = 0; h < forecast.size(); h++) {
+                ForecastHourlyResult result = new ForecastHourlyResult();
+                result.setHour(h);
+                result.setForecastValue(forecast.get(h));
+                result.setJob(job);
+                hourlyResults.add(result);
+            }
+
+            job.setHourlyForecasts(hourlyResults);
             job.setStatus("COMPLETED");
         } catch (Exception e) {
             job.setStatus("FAILED");
@@ -155,7 +167,12 @@ public class ForecastService {
         }
 
         ForecastJob job = jobOpt.get();
-        List<Double> forecast = job.getHourlyForecast();
+        List<ForecastHourlyResult> forecastResults = job.getHourlyForecasts();
+
+        // ✅ Build lookup map once
+        Map<Integer, Double> forecastMap = forecastResults.stream()
+                .collect(Collectors.toMap(ForecastHourlyResult::getHour,
+                        ForecastHourlyResult::getForecastValue));
 
         Instant startInstant = start.toInstant(ZoneOffset.UTC);
         Instant endInstant = end.toInstant(ZoneOffset.UTC);
@@ -176,9 +193,9 @@ public class ForecastService {
 
         for (int h = 0; h < 24; h++) {
             double act = actual[h];
-            double fc = forecast.size() > h ? forecast.get(h) : 0.0;
-            double err = 0;
+            double fc = forecastMap.getOrDefault(h, 0.0); // ✅ use map lookup
 
+            double err = 0;
             if (act > 0) {
                 err = Math.abs((act - fc) / act) * 100;
                 totalErr += err;
@@ -192,36 +209,47 @@ public class ForecastService {
         return new AccuracyResponse(zoneId, date.toString(), mape, hourly);
     }
 
+
     // 🔹 Helpers
     private List<Double> generateForecastFromHistory(List<LoadRecord> history) {
         double[] sum = new double[24];
-        int[] cnt = new int[24];
+        int[] count = new int[24];
+
         for (LoadRecord l : history) {
             int h = l.getTimestamp().atZone(ZoneOffset.UTC).getHour();
             sum[h] += l.getDemandMW();
-            cnt[h]++;
+            count[h]++;
         }
-        List<Double> out = new ArrayList<>();
-        Random r = new Random();
+
+        List<Double> forecast = new ArrayList<>();
         for (int h = 0; h < 24; h++) {
-            if (cnt[h] > 0) {
-                double avg = sum[h] / cnt[h];
-                double noise = avg * 0.05 * (r.nextDouble() - 0.5);
-                out.add(round(avg + noise));
+            if (count[h] > 0) {
+                double avg = sum[h] / count[h];
+                forecast.add(round(avg));
             } else {
-                out.add(round(100 + 400 * r.nextDouble()));
+                // fallback: use last available day’s value for this hour
+                forecast.add(round(getLastAvailableHour(history, h)));
             }
         }
-        return out;
+        return forecast;
+    }
+
+    private double getLastAvailableHour(List<LoadRecord> history, int hour) {
+        return history.stream()
+                .filter(l -> l.getTimestamp().atZone(ZoneOffset.UTC).getHour() == hour)
+                .mapToDouble(LoadRecord::getDemandMW)
+                .reduce((first, second) -> second) // last value
+                .orElse(0.0);
     }
 
     private List<Double> generateMock24HourData() {
-        Random r = new Random();
-        List<Double> mock = new ArrayList<>();
-        for (int i = 0; i < 24; i++) {
-            mock.add(round(100 + 400 * r.nextDouble()));
+        List<Double> baseline = new ArrayList<>();
+        // Example: simple sinusoidal curve to mimic daily demand pattern
+        for (int h = 0; h < 24; h++) {
+            double base = 300 + 100 * Math.sin(Math.PI * h / 12); // peak midday
+            baseline.add(round(base));
         }
-        return mock;
+        return baseline;
     }
 
     private double round(double v) {
@@ -229,14 +257,20 @@ public class ForecastService {
     }
 
     public ForecastJobDTO toDTO(ForecastJob job) {
+        List<HourlyForecastDTO> forecastValues = job.getHourlyForecasts().stream()
+                .sorted(Comparator.comparingInt(ForecastHourlyResult::getHour))
+                .map(r -> new HourlyForecastDTO(r.getHour(), r.getForecastValue(), 0.0)) // actual=0.0 here
+                .toList();
+
         return ForecastJobDTO.builder()
                 .id(job.getId())
-                .zoneId(Long.valueOf(job.getZoneId()))
+                .zoneId(job.getZoneId())   // keep as String
                 .modelVersion(job.getModelVersion())
                 .status(job.getStatus())
                 .targetDate(job.getTargetDate())
                 .createdAt(job.getCreatedAt())
-                .hourlyForecast(job.getHourlyForecast())
+                .hourlyForecast(forecastValues)
                 .build();
     }
+
 }
