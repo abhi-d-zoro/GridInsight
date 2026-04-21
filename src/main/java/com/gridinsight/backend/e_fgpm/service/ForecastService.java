@@ -4,7 +4,9 @@ import com.gridinsight.backend.d_lmdam.entity.LoadRecord;
 import com.gridinsight.backend.d_lmdam.repository.LoadRecordRepository;
 import com.gridinsight.backend.e_fgpm.dto.*;
 import com.gridinsight.backend.e_fgpm.entity.ForecastJob;
+import com.gridinsight.backend.e_fgpm.entity.MonthForecastRecord;
 import com.gridinsight.backend.e_fgpm.repository.ForecastJobRepository;
+import com.gridinsight.backend.e_fgpm.repository.MonthForecastRepository;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,6 +24,7 @@ public class ForecastService {
     private static final Logger log = LoggerFactory.getLogger(ForecastService.class);
     private final ForecastJobRepository repository;
     private final LoadRecordRepository loadDataRepository;
+    private final MonthForecastRepository monthForecastRepository;
 
     // 🔹 Day-Ahead Forecast
     public DayAheadForecastResponse generateDayAheadForecast(String zoneId, LocalDate date) {
@@ -60,21 +63,42 @@ public class ForecastService {
         return new DayAheadForecastResponse(zoneId, date, hourlyData);
     }
 
-    // 🔹 Month-Ahead Forecast
-    public MonthAheadForecastResponse generateMonthAheadForecast(String assetType) {
-        List<DailyForecastDTO> daily = new ArrayList<>();
-        LocalDate today = LocalDate.now();
-        Random r = new Random();
-        double base = assetType.equalsIgnoreCase("SOLAR") ? 50.0 : 120.0;
+    private Double safeRound(Double value) {
+        return value == null ? null : round(value);
+    }
 
-        for (int i = 0; i < 30; i++) {
-            LocalDate d = today.plusDays(i);
-            double val = base + (r.nextDouble() * 10 - 5);
-            double low = val * 0.95;
-            double high = val * 1.05;
-            daily.add(new DailyForecastDTO(d, round(val), round(low), round(high)));
+    public MonthAheadForecastResponse generateMonthAheadForecast(String assetType) {
+        List<MonthForecastRecord> records =
+                monthForecastRepository.findByAssetTypeOrderByForecastDateAsc(assetType);
+
+        if (records == null || records.isEmpty()) {
+            log.warn("No month-ahead forecasts found for assetType={}", assetType);
+            return new MonthAheadForecastResponse(assetType, List.of());
         }
+
+        List<DailyForecastDTO> daily = records.stream()
+                .map(r -> new DailyForecastDTO(
+                        r.getForecastDate(),
+                        safeRound(r.getForecastValue()),
+                        safeRound(r.getLowerBound()),
+                        safeRound(r.getUpperBound())))
+                .toList();
+
         return new MonthAheadForecastResponse(assetType, daily);
+    }
+
+    public MonthForecastRecord calculateBounds(MonthForecastRecord record) {
+        double margin = 0.15;
+        double forecast = record.getForecastValue();
+        record.setLowerBound(forecast * (1 - margin));
+        record.setUpperBound(forecast * (1 + margin));
+        return record;
+    }
+
+    @Transactional
+    public MonthForecastRecord saveMonthForecast(MonthForecastRecord record) {
+        MonthForecastRecord withBounds = calculateBounds(record);
+        return monthForecastRepository.save(withBounds);
     }
 
     @Transactional
@@ -127,7 +151,6 @@ public class ForecastService {
                         zoneId, date, "COMPLETED");
 
         if (jobOpt.isEmpty()) {
-            // Return safe empty response instead of throwing
             return new AccuracyResponse(zoneId, date.toString(), 0.0, Collections.emptyList());
         }
 
