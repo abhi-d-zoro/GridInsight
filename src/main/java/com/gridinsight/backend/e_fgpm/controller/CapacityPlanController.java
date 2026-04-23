@@ -9,7 +9,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-//changed by tabassum
 @RestController
 @RequestMapping("/api/v1/capacity-plans")
 @RequiredArgsConstructor
@@ -17,14 +16,14 @@ public class CapacityPlanController {
 
     private final CapacityPlanService service;
 
-    // ✅ NEW: Get all capacity plans
+
     @PreAuthorize("hasAnyRole('PLANNER','ADMIN')")
     @GetMapping
     public List<CapacityPlanDTO> getAllPlans() {
         return service.getAllPlans();
     }
 
-    // ✅ Create Plan
+
     @PreAuthorize("hasAnyRole('PLANNER','ADMIN')")
     @PostMapping
     public ResponseEntity<CapacityPlanDTO> createPlan(@RequestBody CapacityPlanRequest request) {
@@ -32,7 +31,6 @@ public class CapacityPlanController {
         return new ResponseEntity<>(createdPlan, HttpStatus.CREATED);
     }
 
-    // ✅ PDF Export
     @PreAuthorize("hasAnyRole('PLANNER','ADMIN')")
     @GetMapping("/{id}/export-pdf")
     public ResponseEntity<byte[]> exportPdf(@PathVariable Long id) {

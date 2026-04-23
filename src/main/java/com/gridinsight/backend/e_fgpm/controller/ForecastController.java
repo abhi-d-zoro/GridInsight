@@ -12,13 +12,11 @@ import org.springframework.web.bind.annotation.*;
 import com.gridinsight.backend.e_fgpm.entity.MonthForecastRecord;
 import com.gridinsight.backend.e_fgpm.repository.MonthForecastRepository;
 
-// Spring Web + HTTP
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-
-
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -33,7 +31,7 @@ public class ForecastController {
     private final ForecastJobRepository repository;
     private final MonthForecastRepository monthForecastRepository;
 
-    // 🔹 Jobs Endpoints
+
     @PreAuthorize("hasAnyRole('PLANNER','ADMIN')")
     @GetMapping("/jobs")
     public List<ForecastJobDTO> getAllJobs() {
@@ -73,7 +71,7 @@ public class ForecastController {
                 .toList();
     }
 
-    // 🔹 NEW: Day-Ahead Forecast
+
     @PreAuthorize("hasAnyRole('PLANNER','ADMIN')")
     @GetMapping("/day-ahead")
     public ResponseEntity<DayAheadForecastResponse> getDayAheadForecast(
@@ -82,7 +80,7 @@ public class ForecastController {
         return ResponseEntity.ok(forecastService.generateDayAheadForecast(zoneId, date));
     }
 
-    // 🔹 Month-Ahead Forecast
+
     @PreAuthorize("hasAnyRole('PLANNER','ADMIN')")
     @GetMapping("/month-ahead")
     public ResponseEntity<MonthAheadForecastResponse> getMonthAheadForecast(
@@ -94,28 +92,25 @@ public class ForecastController {
     @PostMapping("/month-ahead")
     public ResponseEntity<MonthForecastRecord> insertMonthAheadForecast(
             @RequestBody MonthForecastRecord record) {
-        MonthForecastRecord saved = forecastService.saveMonthForecast(record); // ✅ use service
+        MonthForecastRecord saved = forecastService.saveMonthForecast(record);
         return ResponseEntity.status(HttpStatus.CREATED).body(saved);
     }
 
-    // 🔹 Run Forecast Job
-    @PreAuthorize("hasAnyRole('PLANNER','ADMIN')")
     @PostMapping("/run")
     public ResponseEntity<?> runForecast(@RequestBody ForecastRequest request) {
-        if (request.getZoneId() == null) {
-            return ResponseEntity.badRequest().body("zoneId is required");
+        try {
+            ForecastJobDTO pendingJob =
+                    forecastService.initiateForecast(request.getZoneId(), request.getTargetDate());
+            forecastService.executeForecastAsync(pendingJob.getId());
+            return ResponseEntity.status(HttpStatus.ACCEPTED).body(pendingJob);
+        } catch (ResponseStatusException e) {
+            return ResponseEntity.status(e.getStatusCode()).body(e.getReason());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error: " + e.getMessage());
         }
-        if (request.getTargetDate() == null) {
-            return ResponseEntity.badRequest().body("targetDate is required");
-        }
-
-        ForecastJobDTO pendingJob =
-                forecastService.initiateForecast(request.getZoneId(), request.getTargetDate());
-
-        forecastService.executeForecastAsync(pendingJob.getId());
-
-        return ResponseEntity.status(HttpStatus.ACCEPTED).body(pendingJob);
     }
+
 
     @PreAuthorize("hasAnyRole('PLANNER','ADMIN')")
     @GetMapping("/job/{id}")
@@ -126,7 +121,7 @@ public class ForecastController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    // 🔹 Update Job Status
+
     @PreAuthorize("hasAnyRole('PLANNER','ADMIN')")
     @PutMapping("/job/{id}/status")
     public ResponseEntity<?> updateJobStatus(@PathVariable Long id, @RequestParam String status) {
@@ -147,7 +142,7 @@ public class ForecastController {
         return ResponseEntity.ok(forecastService.toDTO(job));
     }
 
-    // 🔹 Accuracy
+
     @PreAuthorize("hasAnyRole('PLANNER','ADMIN')")
     @GetMapping("/accuracy")
     public ResponseEntity<?> getForecastAccuracy(
@@ -162,7 +157,6 @@ public class ForecastController {
         }
     }
 
-    // 🔹 Accuracy Export CSV
     @PreAuthorize("hasAnyRole('PLANNER','ADMIN')")
     @GetMapping(value = "/accuracy/export", produces = "text/csv")
     public ResponseEntity<?> exportAccuracyCsv(

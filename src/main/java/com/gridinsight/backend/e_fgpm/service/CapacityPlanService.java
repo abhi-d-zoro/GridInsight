@@ -45,7 +45,7 @@ public class CapacityPlanService {
                 .toList();
     }
 
-    // ✅ Generate a real PDF
+    // Generate a real PDF
     public byte[] exportPlanToPdf(Long planId) {
         CapacityPlan plan = repository.findById(planId)
                 .orElseThrow(() -> new RuntimeException("Plan not found"));

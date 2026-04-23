@@ -13,11 +13,12 @@ public interface ForecastJobRepository extends JpaRepository<ForecastJob, Long> 
 
     List<ForecastJob> findByZoneId(String zoneId);
 
+
     List<ForecastJob> findByTargetDate(LocalDate targetDate);
 
-    List<ForecastJob> findByZoneIdAndTargetDate(String zoneId, LocalDate targetDate);
+    Optional<ForecastJob> findByZoneIdAndTargetDate(String zoneId, LocalDate targetDate);
 
-    // ✅ For accuracy calculation
+
     Optional<ForecastJob> findFirstByZoneIdAndTargetDateAndStatusOrderByCreatedAtDesc(
             String zoneId, LocalDate targetDate, String status);
 }

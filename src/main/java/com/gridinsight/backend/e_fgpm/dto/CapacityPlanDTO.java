@@ -1,7 +1,6 @@
 package com.gridinsight.backend.e_fgpm.dto;
 
 import java.time.LocalDateTime;
-//changed by tabassum
 public class CapacityPlanDTO {
     private Long id;
     private String zoneId;
