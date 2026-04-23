@@ -25,7 +25,6 @@ public class ForecastJob {
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime createdAt;
 
-    // ✅ Replace List<Double> with proper entity mapping
     @OneToMany(mappedBy = "job", cascade = CascadeType.ALL, fetch = FetchType.EAGER, orphanRemoval = true)
     private List<ForecastHourlyResult> hourlyForecasts = new ArrayList<>();
 

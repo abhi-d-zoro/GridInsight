@@ -4,7 +4,7 @@ import java.time.LocalDate;
 
 public class DailyForecastDTO {
     private LocalDate date;
-    private Double forecastValueMW;              // ✅ Changed to Double
+    private Double forecastValueMW;
     private Double confidenceIntervalLower;
     private Double confidenceIntervalUpper;
 

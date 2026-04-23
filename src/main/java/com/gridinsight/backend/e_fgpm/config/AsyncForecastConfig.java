@@ -6,10 +6,6 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.util.concurrent.Executor;
 
-/**
- * Configures a dedicated thread pool for asynchronous forecast jobs.
- * Referenced by @Async("forecastExecutor") in ForecastService.
- */
 @Configuration
 public class AsyncForecastConfig {
 

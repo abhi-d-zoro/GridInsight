@@ -11,9 +11,12 @@ import com.gridinsight.backend.e_fgpm.repository.MonthForecastRepository;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+
 import java.util.stream.Collectors;
 
 
@@ -29,7 +32,7 @@ public class ForecastService {
     private final LoadRecordRepository loadDataRepository;
     private final MonthForecastRepository monthForecastRepository;
 
-    // 🔹 Day-Ahead Forecast
+    // Day-Ahead Forecast
     public DayAheadForecastResponse generateDayAheadForecast(String zoneId, LocalDate date) {
         LocalDateTime start = date.atStartOfDay();
         LocalDateTime end = start.plusDays(1).minusSeconds(1);
@@ -106,14 +109,25 @@ public class ForecastService {
 
     @Transactional
     public ForecastJobDTO initiateForecast(String zoneId, LocalDate targetDate) {
-        ForecastJob job = new ForecastJob();
-        job.setZoneId(zoneId);
-        job.setTargetDate(targetDate);
-        job.setModelVersion("v1.0");
-        job.setStatus("PENDING");
+        Optional<ForecastJob> existing = repository.findByZoneIdAndTargetDate(zoneId, targetDate);
+
+        ForecastJob job;
+        if (existing.isPresent()) {
+            job = existing.get();
+            job.setStatus("PENDING");
+            job.setModelVersion("v1.0");
+        } else {
+            job = new ForecastJob();
+            job.setZoneId(zoneId);
+            job.setTargetDate(targetDate);
+            job.setModelVersion("v1.0");
+            job.setStatus("PENDING");
+        }
+
         job = repository.save(job);
         return toDTO(job);
     }
+
 
     @Async("forecastExecutor")
     @Transactional
@@ -135,25 +149,24 @@ public class ForecastService {
 
             List<Double> forecast =
                     history.isEmpty() ? generateMock24HourData() : generateForecastFromHistory(history);
-
-            List<ForecastHourlyResult> hourlyResults = new ArrayList<>();
+            job.getHourlyForecasts().clear();
             for (int h = 0; h < forecast.size(); h++) {
                 ForecastHourlyResult result = new ForecastHourlyResult();
                 result.setHour(h);
                 result.setForecastValue(forecast.get(h));
                 result.setJob(job);
-                hourlyResults.add(result);
+                job.getHourlyForecasts().add(result);
             }
-
-            job.setHourlyForecasts(hourlyResults);
             job.setStatus("COMPLETED");
+
         } catch (Exception e) {
             job.setStatus("FAILED");
         }
         repository.save(job);
     }
 
-    // 🔹 Accuracy Calculation
+
+    // Accuracy Calculation
     public AccuracyResponse calculateAccuracy(String zoneId, LocalDate date) {
         LocalDateTime start = date.atStartOfDay();
         LocalDateTime end = start.plusDays(1).minusSeconds(1);
@@ -169,7 +182,7 @@ public class ForecastService {
         ForecastJob job = jobOpt.get();
         List<ForecastHourlyResult> forecastResults = job.getHourlyForecasts();
 
-        // ✅ Build lookup map once
+
         Map<Integer, Double> forecastMap = forecastResults.stream()
                 .collect(Collectors.toMap(ForecastHourlyResult::getHour,
                         ForecastHourlyResult::getForecastValue));
@@ -193,7 +206,7 @@ public class ForecastService {
 
         for (int h = 0; h < 24; h++) {
             double act = actual[h];
-            double fc = forecastMap.getOrDefault(h, 0.0); // ✅ use map lookup
+            double fc = forecastMap.getOrDefault(h, 0.0);
 
             double err = 0;
             if (act > 0) {
@@ -210,7 +223,7 @@ public class ForecastService {
     }
 
 
-    // 🔹 Helpers
+    // Helpers
     private List<Double> generateForecastFromHistory(List<LoadRecord> history) {
         double[] sum = new double[24];
         int[] count = new int[24];
@@ -259,12 +272,12 @@ public class ForecastService {
     public ForecastJobDTO toDTO(ForecastJob job) {
         List<HourlyForecastDTO> forecastValues = job.getHourlyForecasts().stream()
                 .sorted(Comparator.comparingInt(ForecastHourlyResult::getHour))
-                .map(r -> new HourlyForecastDTO(r.getHour(), r.getForecastValue(), 0.0)) // actual=0.0 here
+                .map(r -> new HourlyForecastDTO(r.getHour(), r.getForecastValue(), 0.0))
                 .toList();
 
         return ForecastJobDTO.builder()
                 .id(job.getId())
-                .zoneId(job.getZoneId())   // keep as String
+                .zoneId(job.getZoneId())
                 .modelVersion(job.getModelVersion())
                 .status(job.getStatus())
                 .targetDate(job.getTargetDate())
